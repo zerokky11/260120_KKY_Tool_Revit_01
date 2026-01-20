@@ -25,11 +25,6 @@ export function renderActiveMenu(root) {
       '패밀리 공유파라미터 추가 및 연동',
       '활성 문서에서 공유 파라미터 추가 및 연동 상태를 점검합니다.',
       'paramprop'
-    ),
-    buildCard(
-      'Shared Param Batch',
-      '공유 파라미터를 여러 RVT에 배치 바인딩합니다.',
-      'sharedparambatch'
     )
   );
 
