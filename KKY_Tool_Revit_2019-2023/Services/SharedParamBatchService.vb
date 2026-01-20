@@ -205,7 +205,7 @@ Namespace Services
                     defs.Add(New With {
                         .name = ext.Name,
                         .guid = ext.GUID.ToString("D"),
-                        .paramTypeLabel = TryGetParamTypeLabel(ext),
+                        .paramTypeLabel = GetExternalDefinitionTypeLabel(ext),
                         .desc = If(ext.Description, String.Empty)
                     })
                 Next
@@ -495,12 +495,57 @@ Namespace Services
             })
         End Sub
 
-        Private Shared Function TryGetParamTypeLabel(ext As ExternalDefinition) As String
-            If ext Is Nothing Then Return String.Empty
+        Private Shared Function GetExternalDefinitionTypeLabel(ed As Autodesk.Revit.DB.ExternalDefinition) As String
+            If ed Is Nothing Then Return ""
+
+            ' (A) Old API: ParameterType
             Try
-                Return LabelUtils.GetLabelFor(ext.ParameterType)
+                Dim pi = ed.GetType().GetProperty("ParameterType")
+                If pi IsNot Nothing Then
+                    Dim ptObj As Object = pi.GetValue(ed, Nothing)
+                    If ptObj IsNot Nothing Then
+                        Dim mi = GetType(Autodesk.Revit.DB.LabelUtils).GetMethod("GetLabelFor", New Type() {ptObj.GetType()})
+                        If mi IsNot Nothing Then
+                            Return Convert.ToString(mi.Invoke(Nothing, New Object() {ptObj}))
+                        End If
+                        Return ptObj.ToString()
+                    End If
+                End If
             Catch
-                Return ext.ParameterType.ToString()
+                ' ignore
+            End Try
+
+            ' (B) New API: GetDataType() -> ForgeTypeId (do not type-reference)
+            Try
+                Dim miGetDt = ed.GetType().GetMethod("GetDataType", Type.EmptyTypes)
+                If miGetDt IsNot Nothing Then
+                    Dim dtObj As Object = miGetDt.Invoke(ed, Nothing)
+                    If dtObj IsNot Nothing Then
+                        Dim miLabel = GetType(Autodesk.Revit.DB.LabelUtils).GetMethod("GetLabelForSpec", New Type() {dtObj.GetType()})
+                        If miLabel Is Nothing Then
+                            miLabel = GetType(Autodesk.Revit.DB.LabelUtils).GetMethod("GetLabelFor", New Type() {dtObj.GetType()})
+                        End If
+                        If miLabel IsNot Nothing Then
+                            Return Convert.ToString(miLabel.Invoke(Nothing, New Object() {dtObj}))
+                        End If
+
+                        Dim piTypeId = dtObj.GetType().GetProperty("TypeId")
+                        If piTypeId IsNot Nothing Then
+                            Return Convert.ToString(piTypeId.GetValue(dtObj, Nothing))
+                        End If
+
+                        Return dtObj.ToString()
+                    End If
+                End If
+            Catch
+                ' ignore
+            End Try
+
+            ' final fallback (never empty if possible)
+            Try
+                Return ed.ToString()
+            Catch
+                Return ""
             End Try
         End Function
 
