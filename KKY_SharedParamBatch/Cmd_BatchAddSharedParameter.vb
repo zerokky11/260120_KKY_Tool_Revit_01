@@ -619,11 +619,11 @@ Namespace Global.KKY_Tool_Revit
         End Function
 
 #If REVIT2025 Then
-        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As Object
+        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As ForgeTypeId
             Return group.ToGroupTypeId()
         End Function
 #Else
-        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As Object
+        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As BuiltInParameterGroup
             Return group
         End Function
 #End If
