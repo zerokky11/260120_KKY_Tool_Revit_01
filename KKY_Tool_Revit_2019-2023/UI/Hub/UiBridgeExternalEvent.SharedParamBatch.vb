@@ -130,10 +130,11 @@ Namespace UI.Hub
             End If
 
             Try
-                Dim psi As New ProcessStartInfo("explorer.exe", "\"" & targetPath & "\"")
+                Dim targetPathText As String = targetPath.ToString()
+                Dim psi As New ProcessStartInfo("explorer.exe", """" & targetPathText & """")
                 psi.UseShellExecute = True
                 Process.Start(psi)
-                SendToWeb("sharedparambatch:open-folder", New With {.ok = True, .path = targetPath})
+                SendToWeb("sharedparambatch:open-folder", New With {.ok = True, .path = targetPathText})
             Catch ex As Exception
                 SendToWeb("sharedparambatch:open-folder", New With {.ok = False, .message = ex.Message})
             End Try

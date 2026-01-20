@@ -879,7 +879,7 @@ Namespace Services
                 Return False
             End If
 
-            Dim binding As Binding = Nothing
+            Dim binding As Autodesk.Revit.DB.Binding = Nothing
             If p.Settings.IsInstanceBinding Then
                 binding = app.Create.NewInstanceBinding(catSet)
             Else
