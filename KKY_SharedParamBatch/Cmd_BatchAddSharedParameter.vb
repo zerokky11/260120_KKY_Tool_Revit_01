@@ -314,11 +314,7 @@ Namespace Global.KKY_Tool_Revit
             Public ReadOnly Property ParamGroupDisplay As String
                 Get
                     If Settings Is Nothing Then Return "-"
-                    Try
-                        Return LabelUtils.GetLabelFor(Settings.ParamGroup)
-                    Catch
-                        Return Settings.ParamGroup.ToString()
-                    End Try
+                    Return GetParamGroupLabel(Settings.ParamGroup)
                 End Get
             End Property
 
@@ -547,9 +543,9 @@ Namespace Global.KKY_Tool_Revit
 
                     Dim map As BindingMap = doc.ParameterBindings
 
-                    Dim insertedOk As Boolean = map.Insert(extDef, binding, p.Settings.ParamGroup)
+                    Dim insertedOk As Boolean = map.Insert(extDef, binding, GetParamGroupId(p.Settings.ParamGroup))
                     If Not insertedOk Then
-                        insertedOk = map.ReInsert(extDef, binding, p.Settings.ParamGroup)
+                        insertedOk = map.ReInsert(extDef, binding, GetParamGroupId(p.Settings.ParamGroup))
                     End If
 
                     If Not insertedOk Then
@@ -612,6 +608,50 @@ Namespace Global.KKY_Tool_Revit
             End If
             Return "(SavedId=" & cref.IdInt & ")"
         End Function
+
+#If REVIT2025 Then
+        Private Shared Function GetParamGroupLabel(group As BuiltInParameterGroup) As String
+            Try
+                Return LabelUtils.GetLabelFor(group.ToGroupTypeId())
+            Catch
+                Return group.ToString()
+            End Try
+        End Function
+
+        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As ForgeTypeId
+            Return group.ToGroupTypeId()
+        End Function
+
+        Private Shared Function GetParamTypeLabel(def As ExternalDefinition) As String
+            If def Is Nothing Then Return ""
+            Try
+                Return LabelUtils.GetLabelFor(def.GetDataType())
+            Catch
+                Return def.GetDataType().ToString()
+            End Try
+        End Function
+#Else
+        Private Shared Function GetParamGroupLabel(group As BuiltInParameterGroup) As String
+            Try
+                Return LabelUtils.GetLabelFor(group)
+            Catch
+                Return group.ToString()
+            End Try
+        End Function
+
+        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As BuiltInParameterGroup
+            Return group
+        End Function
+
+        Private Shared Function GetParamTypeLabel(def As ExternalDefinition) As String
+            If def Is Nothing Then Return ""
+            Try
+                Return LabelUtils.GetLabelFor(def.ParameterType)
+            Catch
+                Return def.ParameterType.ToString()
+            End Try
+        End Function
+#End If
 
         Private Shared Function ResolveCategoryInDoc(maps As CategoryMaps, cref As CategoryRef, ByRef resolvedBy As String) As Category
             resolvedBy = ""
@@ -1310,12 +1350,7 @@ Namespace Global.KKY_Tool_Revit
                         Continue For
                     End If
 
-                    Dim typeLabel As String = ""
-                    Try
-                        typeLabel = LabelUtils.GetLabelFor(it.Def.ParameterType)
-                    Catch
-                        typeLabel = it.Def.ParameterType.ToString()
-                    End Try
+                    Dim typeLabel As String = GetParamTypeLabel(it.Def)
 
                     Dim p As New ParamToBind() With {
                         .GroupName = Convert.ToString(cmbGroup.SelectedItem),
@@ -1700,12 +1735,7 @@ Namespace Global.KKY_Tool_Revit
                 Dim items As New List(Of ParamGroupItem)()
 
                 For Each v As BuiltInParameterGroup In [Enum].GetValues(GetType(BuiltInParameterGroup))
-                    Dim label As String = ""
-                    Try
-                        label = LabelUtils.GetLabelFor(v)
-                    Catch
-                        label = v.ToString()
-                    End Try
+                    Dim label As String = GetParamGroupLabel(v)
                     items.Add(New ParamGroupItem(v, label))
                 Next
 
