@@ -609,49 +609,64 @@ Namespace Global.KKY_Tool_Revit
             Return "(SavedId=" & cref.IdInt & ")"
         End Function
 
-#If REVIT2025 Then
         Private Shared Function GetParamGroupLabel(group As BuiltInParameterGroup) As String
-            Try
-                Return LabelUtils.GetLabelFor(group.ToGroupTypeId())
-            Catch
+            Dim key As Object = GetParamGroupId(group)
+            Dim label As String = InvokeLabelFor(key)
+            If String.IsNullOrWhiteSpace(label) Then
                 Return group.ToString()
-            End Try
+            End If
+            Return label
         End Function
 
-        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As ForgeTypeId
+#If REVIT2025 Then
+        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As Object
             Return group.ToGroupTypeId()
         End Function
-
-        Private Shared Function GetParamTypeLabel(def As ExternalDefinition) As String
-            If def Is Nothing Then Return ""
-            Try
-                Return LabelUtils.GetLabelFor(def.GetDataType())
-            Catch
-                Return def.GetDataType().ToString()
-            End Try
-        End Function
 #Else
-        Private Shared Function GetParamGroupLabel(group As BuiltInParameterGroup) As String
-            Try
-                Return LabelUtils.GetLabelFor(group)
-            Catch
-                Return group.ToString()
-            End Try
-        End Function
-
-        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As BuiltInParameterGroup
+        Private Shared Function GetParamGroupId(group As BuiltInParameterGroup) As Object
             Return group
         End Function
+#End If
 
         Private Shared Function GetParamTypeLabel(def As ExternalDefinition) As String
             If def Is Nothing Then Return ""
-            Try
-                Return LabelUtils.GetLabelFor(def.ParameterType)
-            Catch
-                Return def.ParameterType.ToString()
-            End Try
+            Dim paramTypeKey As Object = GetExternalDefinitionTypeKey(def)
+            Dim label As String = InvokeLabelFor(paramTypeKey)
+            If String.IsNullOrWhiteSpace(label) Then
+                Return If(paramTypeKey IsNot Nothing, paramTypeKey.ToString(), "")
+            End If
+            Return label
         End Function
-#End If
+
+        Private Shared Function GetExternalDefinitionTypeKey(def As ExternalDefinition) As Object
+            If def Is Nothing Then Return Nothing
+
+            Dim defType As Type = def.GetType()
+            Dim getDataType = defType.GetMethod("GetDataType", Type.EmptyTypes)
+            If getDataType IsNot Nothing Then
+                Return getDataType.Invoke(def, Nothing)
+            End If
+
+            Dim paramTypeProp = defType.GetProperty("ParameterType")
+            If paramTypeProp IsNot Nothing Then
+                Return paramTypeProp.GetValue(def, Nothing)
+            End If
+
+            Return Nothing
+        End Function
+
+        Private Shared Function InvokeLabelFor(value As Object) As String
+            If value Is Nothing Then Return ""
+            Try
+                Dim labelType As Type = GetType(LabelUtils)
+                Dim method = labelType.GetMethod("GetLabelFor", New Type() {value.GetType()})
+                If method IsNot Nothing Then
+                    Return Convert.ToString(method.Invoke(Nothing, New Object() {value}))
+                End If
+            Catch
+            End Try
+            Return ""
+        End Function
 
         Private Shared Function ResolveCategoryInDoc(maps As CategoryMaps, cref As CategoryRef, ByRef resolvedBy As String) As Category
             resolvedBy = ""
