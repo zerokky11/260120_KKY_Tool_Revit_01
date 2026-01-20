@@ -167,6 +167,7 @@ Namespace UI.Hub
             map.Add("hub:multi-run", "HandleMultiRun")
             map.Add("hub:multi-export", "HandleMultiExport")
             map.Add("hub:multi-clear", "HandleMultiClear")
+            map.Add("hub:sharedparam-batch", "HandleSharedParamBatchRun")
             map.Add("commonoptions:get", "HandleCommonOptionsGet")
             map.Add("commonoptions:save", "HandleCommonOptionsSave")
 

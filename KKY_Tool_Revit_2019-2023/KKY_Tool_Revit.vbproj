@@ -113,6 +113,9 @@
 	<ItemGroup>
 		<Compile Include="APP.vb" />
 		<Compile Include="Commands\CmdOpenHub.vb" />
+		<Compile Include="..\KKY_SharedParamBatch\Cmd_BatchAddSharedParameter.vb">
+			<Link>Commands\Cmd_BatchAddSharedParameter.vb</Link>
+		</Compile>
 		<Compile Include="Exports\PointsExport.vb" />
 		<Compile Include="Exports\ConnectorExport.vb" />
 		<Compile Include="Exports\DuplicateExport.vb" />
@@ -138,6 +141,7 @@
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.ParamProp.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.FamilyLinkAudit.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.Multi.vb" />
+		<Compile Include="UI\Hub\UiBridgeExternalEvent.SharedParamBatch.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.Core.vb" />
 		<Compile Include="UI\Hub\HubHostWindow.vb" />
 	</ItemGroup>
