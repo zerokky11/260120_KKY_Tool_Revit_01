@@ -139,6 +139,12 @@ Namespace UI.Hub
             map.Add("sharedparam:list", "HandleSharedParamList")
             map.Add("sharedparam:status", "HandleSharedParamStatus")
             map.Add("sharedparam:export-excel", "HandleSharedParamExport")
+            ' Shared Parameter Batch
+            map.Add("sharedparambatch:init", "HandleSharedParamBatchInit")
+            map.Add("sharedparambatch:browse-rvts", "HandleSharedParamBatchBrowseRvts")
+            map.Add("sharedparambatch:run", "HandleSharedParamBatchRun")
+            map.Add("sharedparambatch:export-excel", "HandleSharedParamBatchExportExcel")
+            map.Add("sharedparambatch:open-folder", "HandleSharedParamBatchOpenFolder")
             ' 공통 Excel 동작
             map.Add("excel:open", "HandleExcelOpen")
             ' Segment ↔ PMS Check
