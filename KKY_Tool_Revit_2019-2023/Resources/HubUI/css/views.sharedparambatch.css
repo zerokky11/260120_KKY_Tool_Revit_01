@@ -1,0 +1,48 @@
+/* ==========================================================
+   Shared Parameter Batch view styles
+   ========================================================== */
+
+.sharedparambatch-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sharedparambatch-layout {
+    display: grid;
+    gap: 14px;
+}
+
+.sharedparambatch-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-soft);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-soft);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sharedparambatch-card h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.sharedparambatch-list,
+.sharedparambatch-steps {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--text-soft);
+    font-size: 0.84rem;
+}
+
+.sharedparambatch-note {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-soft);
+}

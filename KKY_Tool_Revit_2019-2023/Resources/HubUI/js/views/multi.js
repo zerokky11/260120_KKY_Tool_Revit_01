@@ -86,13 +86,14 @@ export function renderMulti(root) {
 
   const group1 = buildGroupSection('납품 시 BQC 검토', '커넥터 진단 (BQC용)', 'bqc');
   const group2 = buildGroupSection('주기적 검토', 'PMS / GUID / 파라미터 연동', 'periodic');
-  const group3 = buildGroupSection('유틸리티', '공유 파라미터 연동 / Point 추출', 'utility');
+  const group3 = buildGroupSection('유틸리티', '공유 파라미터 연동 / Point 추출 / 공유 파라미터 일괄 추가', 'utility');
 
   const group1Options = buildGroup1Options();
   group1.section.append(group1Options);
   group1.section.append(buildToggleRow('connector', buildConnectorConfig()));
   group2.section.append(buildPmsWorkflowRow());
   group2.section.append(buildToggleRow('guid', buildGuidConfig()));
+  group3.section.append(buildSharedParamBatchRow());
   group3.section.append(buildToggleRow('familylink', buildFamilyLinkConfig()));
   group3.section.append(buildToggleRow('points', buildPointsConfig()));
 
@@ -387,6 +388,36 @@ export function renderMulti(root) {
     row.append(header, summary);
     row.addEventListener('click', () => {
       location.hash = '#segmentpms';
+    });
+    row.classList.add('is-clickable');
+    return row;
+  }
+
+  function buildSharedParamBatchRow() {
+    const row = div('feature-row feature-row--workflow');
+    const header = div('feature-row__header');
+    const left = div('feature-row__left');
+    const icon = document.createElement('span');
+    icon.className = 'feature-row__icon';
+    icon.textContent = 'SP';
+    const title = document.createElement('strong');
+    title.textContent = '공유 파라미터 일괄 추가';
+    const desc = document.createElement('span');
+    desc.textContent = 'Shared Parameter TXT 기반으로 선택 파라미터를 다중 RVT에 일괄 적용';
+    left.append(icon, title, desc);
+
+    const right = div('feature-row__right');
+    const chip = document.createElement('span');
+    chip.className = 'chip chip--info';
+    chip.textContent = '별도 화면';
+    right.append(chip);
+
+    const summary = div('feature-row__summary');
+    summary.textContent = 'Revit 공유 파라미터 설정/카테고리 지정 후 일괄 적용';
+    header.append(left, right);
+    row.append(header, summary);
+    row.addEventListener('click', () => {
+      location.hash = '#sharedparam-batch';
     });
     row.classList.add('is-clickable');
     return row;

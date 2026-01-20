@@ -97,6 +97,9 @@
 		<Compile Include="..\KKY_Tool_Revit_2019-2023\Commands\CmdOpenHub.vb">
 			<Link>Commands\CmdOpenHub.vb</Link>
 		</Compile>
+		<Compile Include="..\KKY_SharedParamBatch\Cmd_BatchAddSharedParameter.vb">
+			<Link>Commands\Cmd_BatchAddSharedParameter.vb</Link>
+		</Compile>
 
 		<!-- 공통 Exports -->
 		<Compile Include="..\KKY_Tool_Revit_2019-2023\Exports\ConnectorExport.vb">
@@ -158,6 +161,9 @@
 		</Compile>
 		<Compile Include="..\KKY_Tool_Revit_2019-2023\UI\Hub\UiBridgeExternalEvent.ParamProp.vb">
 			<Link>UI\Hub\UiBridgeExternalEvent.ParamProp.vb</Link>
+		</Compile>
+		<Compile Include="..\KKY_Tool_Revit_2019-2023\UI\Hub\UiBridgeExternalEvent.SharedParamBatch.vb">
+			<Link>UI\Hub\UiBridgeExternalEvent.SharedParamBatch.vb</Link>
 		</Compile>
 		<Compile Include="..\KKY_Tool_Revit_2019-2023\UI\Hub\UiBridgeExternalEvent.Core.vb">
 			<Link>UI\Hub\UiBridgeExternalEvent.Core.vb</Link>

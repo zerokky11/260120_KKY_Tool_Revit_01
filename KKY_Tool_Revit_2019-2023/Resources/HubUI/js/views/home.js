@@ -31,7 +31,8 @@ export function renderHome(root) {
                 '파라미터 값 연속성 검토: 연결된 객체들의 파라미터 값 연속성 검토',
                 '공유파라미터 GUID 검토: 프로젝트/패밀리 내 공유 파라미터 GUID 검토',
                 '패밀리 공유파라미터 연동 검토: 복합 패밀리 연동 상태 점검',
-                'Point 추출: Project/Survey 포인트 좌표 추출'
+                'Point 추출: Project/Survey 포인트 좌표 추출',
+                '공유 파라미터 일괄 추가: Shared Parameter TXT 기반으로 다중 RVT에 일괄 적용'
             ]
         )
     );

@@ -11,6 +11,7 @@ import { renderParamProp } from './views/paramprop.js';
 import { renderSegmentPms } from './views/segmentpms.js';
 import { renderGuid } from './views/guid.js';
 import { renderFamilyLink } from './views/familylink.js';
+import { renderSharedParamBatch } from './views/sharedparambatch.js';
 import { renderMulti } from './views/multi.js';
 
 initTheme();
@@ -118,6 +119,7 @@ function route() {
         case 'segmentpms': return renderSegmentPms(targetRoot);
         case 'guid': return renderGuid(targetRoot);
         case 'familylink': return renderFamilyLink(targetRoot);
+        case 'sharedparam-batch': return renderSharedParamBatch(targetRoot);
         case 'multi': return renderMulti(targetRoot);
         case 'active-menu': return renderActiveMenu(targetRoot);
         default: return renderHome(targetRoot);
