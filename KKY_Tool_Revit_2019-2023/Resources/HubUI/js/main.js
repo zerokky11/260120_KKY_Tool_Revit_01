@@ -8,6 +8,7 @@ import { renderDup } from './views/dup.js';
 import { renderConn } from './views/conn.js';
 import { renderExport } from './views/export.js';
 import { renderParamProp } from './views/paramprop.js';
+import { renderSharedParamBatch } from './views/sharedparambatch.js';
 import { renderSegmentPms } from './views/segmentpms.js';
 import { renderGuid } from './views/guid.js';
 import { renderFamilyLink } from './views/familylink.js';
@@ -115,6 +116,7 @@ function route() {
         case 'conn': return renderConn(targetRoot);
         case 'export': return renderExport(targetRoot);
         case 'paramprop': return renderParamProp(targetRoot);
+        case 'sharedparambatch': return renderSharedParamBatch(targetRoot);
         case 'segmentpms': return renderSegmentPms(targetRoot);
         case 'guid': return renderGuid(targetRoot);
         case 'familylink': return renderFamilyLink(targetRoot);

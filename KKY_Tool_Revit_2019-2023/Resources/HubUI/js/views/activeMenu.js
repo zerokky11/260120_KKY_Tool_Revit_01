@@ -1,5 +1,7 @@
 import { clear, div } from '../core/dom.js';
 
+const MULTI_MODE_KEY = 'kky.hub.multiMode';
+
 export function renderActiveMenu(root) {
   const target = root || document.getElementById('view-root') || document.getElementById('app');
   clear(target);
@@ -44,7 +46,17 @@ export function renderActiveMenu(root) {
         <span class="active-menu-card__icon">→</span>
       </div>
       <span class="active-menu-cta btn btn--primary">열기</span>`;
-    card.addEventListener('click', () => { location.hash = `#${hash}`; });
+    card.addEventListener('click', () => {
+      if (hash === 'multi') setMultiMode('bqc');
+      location.hash = `#${hash}`;
+    });
     return card;
+  }
+
+  function setMultiMode(mode) {
+    try {
+      localStorage.setItem(MULTI_MODE_KEY, mode);
+    } catch {
+    }
   }
 }
