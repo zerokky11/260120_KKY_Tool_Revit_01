@@ -19,6 +19,8 @@ export function renderSharedParamBatch(root) {
     paramGroups: [],
     selectedGroup: '',
     selectedParams: [],
+    defSelection: new Set(),
+    defSearch: '',
     rvtList: [],
     rvtChecked: new Set(),
     options: {
@@ -52,52 +54,67 @@ export function renderSharedParamBatch(root) {
   const layout = div('sharedparambatch-layout');
   page.append(layout);
 
-  const sourceSection = div('section sharedparambatch-section');
-  sourceSection.append(sectionHeader('Project/Shared Parameter Source', [
-    cardBtn('새로고침', () => post('sharedparambatch:init', {}), 'btn--secondary')
-  ]));
-  const sourceBody = div('sharedparambatch-source');
-  const sourceInput = document.createElement('input');
-  sourceInput.type = 'text';
-  sourceInput.className = 'sharedparambatch-input';
-  sourceInput.readOnly = true;
-  sourceInput.placeholder = 'Shared Parameters TXT 경로';
-  sourceBody.append(labelSpan('TXT Path'), sourceInput);
-  sourceSection.append(sourceBody);
+  const warningSection = div('section sharedparambatch-section spb-warning');
+  const warningText = document.createElement('div');
+  warningText.textContent = 'Shared Parameters TXT가 Revit에 설정되어 있지 않습니다. Manage > Shared Parameters에서 등록 후 새로고침하세요.';
+  const warningActions = div('section-actions');
+  warningActions.append(cardBtn('새로고침', () => post('sharedparambatch:init', {}), 'btn--secondary'));
+  warningSection.append(warningText, warningActions);
+  warningSection.style.display = 'none';
 
   const selectSection = div('section sharedparambatch-section');
   selectSection.append(sectionHeader('Shared Parameter 선택', []));
-  const selectGrid = div('sharedparambatch-select-grid');
 
-  const groupBox = div('sharedparambatch-card');
-  groupBox.append(subTitle('Group'));
   const groupSelect = document.createElement('select');
-  groupSelect.className = 'sharedparambatch-select';
+  groupSelect.className = 'sharedparambatch-select spb-groupSelect';
   groupSelect.addEventListener('change', () => {
     state.selectedGroup = groupSelect.value;
     renderDefinitionList();
   });
-  groupBox.append(groupSelect);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.className = 'sharedparambatch-input spb-search';
+  searchInput.placeholder = '파라미터 검색…';
+  searchInput.addEventListener('input', () => {
+    state.defSearch = (searchInput.value || '').trim();
+    renderDefinitionList();
+  });
+
+  const defHeader = div('spb-defHeader');
+  defHeader.append(labelSpan('Group'), groupSelect, searchInput);
+
+  const addBtn = cardBtn('선택 추가', onAddSelectedDefs);
+  defHeader.append(addBtn);
+
+  const defList = document.createElement('select');
+  defList.className = 'sharedparambatch-def-list spb-defList';
+  defList.multiple = true;
+  defList.addEventListener('change', () => {
+    const next = new Set();
+    Array.from(defList.selectedOptions || []).forEach((opt) => {
+      const guid = opt.dataset.guid;
+      if (guid) next.add(guid);
+    });
+    state.defSelection = next;
+  });
 
   const defBox = div('sharedparambatch-card');
-  defBox.append(subTitle('Definitions (Multi)'));
-  const defList = document.createElement('select');
-  defList.className = 'sharedparambatch-def-list';
-  defList.multiple = true;
-  defBox.append(defList);
-  const addBtn = cardBtn('선택 추가', onAddSelectedDefs);
-  defBox.append(addBtn);
+  defBox.append(defHeader, defList);
 
-  const selectedBox = div('sharedparambatch-card');
-  selectedBox.append(subTitle('Selected Parameters'));
+  const selectGrid = div('sharedparambatch-select-grid');
+  selectGrid.append(defBox);
+  selectSection.append(selectGrid);
+
+  const selectedSection = div('section sharedparambatch-section');
+  selectedSection.append(sectionHeader('Selected Parameters', []));
   const paramTable = document.createElement('table');
   paramTable.className = 'sharedparambatch-table';
   paramTable.innerHTML = '<thead><tr><th>Name</th><th>GUID</th><th>Binding</th><th>Group</th><th>Categories</th><th>Action</th></tr></thead><tbody></tbody>';
   const paramBody = paramTable.querySelector('tbody');
-  selectedBox.append(paramTable);
-
-  selectGrid.append(groupBox, defBox, selectedBox);
-  selectSection.append(selectGrid);
+  const paramWrap = div('spb-tableWrap');
+  paramWrap.append(paramTable);
+  selectedSection.append(paramWrap);
 
   const rvtSection = div('section sharedparambatch-section');
   const rvtHeader = sectionHeader('RVT 파일', [
@@ -107,7 +124,9 @@ export function renderSharedParamBatch(root) {
   ]);
   rvtSection.append(rvtHeader);
   const { table: rvtTable, tbody: rvtBody, master: rvtMaster } = createRvtTable();
-  rvtSection.append(rvtTable);
+  const rvtListWrap = div('spb-rvtList');
+  rvtListWrap.append(rvtTable);
+  rvtSection.append(rvtListWrap);
 
   const optionsSection = div('section sharedparambatch-section');
   optionsSection.append(sectionHeader('Options', []));
@@ -160,7 +179,9 @@ export function renderSharedParamBatch(root) {
 
   resultSection.append(summaryRow, logPathRow, logTable);
 
-  layout.append(sourceSection, selectSection, rvtSection, optionsSection, resultSection);
+  const topGrid = div('spb-topGrid');
+  topGrid.append(selectSection, rvtSection);
+  layout.append(warningSection, topGrid, selectedSection, optionsSection, resultSection);
   page.append(layout);
   page.append(buildSettingsModal());
 
@@ -179,16 +200,16 @@ export function renderSharedParamBatch(root) {
 
   function handleInit(payload) {
     if (!payload || !payload.ok) {
+      warningSection.style.display = 'flex';
       toast(payload?.message || '초기화 실패', 'err');
-      setBusy(false);
       return;
     }
+    warningSection.style.display = 'none';
     state.spFilePath = payload.spFilePath || '';
     state.groups = Array.isArray(payload.groups) ? payload.groups : [];
     state.defsByGroup = payload.defsByGroup || {};
     state.categoryTree = Array.isArray(payload.categoryTree) ? payload.categoryTree : [];
     state.paramGroups = Array.isArray(payload.paramGroups) ? payload.paramGroups : [];
-    sourceInput.value = state.spFilePath || '';
     renderGroupOptions();
     renderDefinitionList();
     renderSelectedParams();
@@ -217,14 +238,18 @@ export function renderSharedParamBatch(root) {
   function renderDefinitionList() {
     defList.innerHTML = '';
     const defs = state.defsByGroup[state.selectedGroup] || [];
-    if (!defs.length) {
+    const search = (state.defSearch || '').toLowerCase();
+    const filtered = search
+      ? defs.filter(d => (d.name || '').toLowerCase().includes(search))
+      : defs;
+    if (!filtered.length) {
       const opt = document.createElement('option');
       opt.value = '';
       opt.textContent = '정의 없음';
       defList.append(opt);
       return;
     }
-    defs.forEach((d) => {
+    filtered.forEach((d) => {
       const opt = document.createElement('option');
       opt.value = d.guid;
       opt.textContent = `${d.name} (${d.paramTypeLabel || ''})`;
@@ -233,6 +258,7 @@ export function renderSharedParamBatch(root) {
       opt.dataset.guid = d.guid;
       opt.dataset.paramTypeLabel = d.paramTypeLabel || '';
       opt.dataset.desc = d.desc || '';
+      if (state.defSelection.has(d.guid)) opt.selected = true;
       defList.append(opt);
     });
   }
@@ -242,9 +268,11 @@ export function renderSharedParamBatch(root) {
     const selected = Array.from(defList.selectedOptions || []);
     if (!selected.length) { toast('추가할 파라미터를 선택하세요.', 'err'); return; }
 
+    const nextSelection = new Set(state.defSelection);
     selected.forEach((opt) => {
       const guid = opt.dataset.guid;
       if (!guid || state.selectedParams.some(p => p.guid === guid)) return;
+      nextSelection.add(guid);
       state.selectedParams.push({
         groupName: opt.dataset.group || state.selectedGroup,
         name: opt.dataset.name || opt.textContent,
@@ -259,6 +287,7 @@ export function renderSharedParamBatch(root) {
         }
       });
     });
+    state.defSelection = nextSelection;
     renderSelectedParams();
   }
 
