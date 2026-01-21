@@ -142,6 +142,7 @@ Namespace UI.Hub
             ' Shared Parameter Batch
             map.Add("sharedparambatch:init", "HandleSharedParamBatchInit")
             map.Add("sharedparambatch:browse-rvts", "HandleSharedParamBatchBrowseRvts")
+            map.Add("sharedparambatch:browse-folder", "HandleSharedParamBatchBrowseFolder")
             map.Add("sharedparambatch:run", "HandleSharedParamBatchRun")
             map.Add("sharedparambatch:export-excel", "HandleSharedParamBatchExportExcel")
             map.Add("sharedparambatch:open-folder", "HandleSharedParamBatchOpenFolder")

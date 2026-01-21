@@ -23,6 +23,7 @@ export function renderSharedParamBatch(root) {
     defSearch: '',
     rvtList: [],
     rvtChecked: new Set(),
+    pendingFolderBrowse: false,
     options: {
       closeAllWorksetsOnOpen: true,
       syncComment: ''
@@ -42,13 +43,11 @@ export function renderSharedParamBatch(root) {
     <h2 class="feature-title">Project Parameter 추가 (Project/Shared)</h2>
     <p class="feature-sub">Project/Shared 파라미터를 여러 RVT에 일괄 추가/바인딩합니다.</p>`;
 
-  const actionRow = div('feature-actions');
   const btnRun = cardBtn('실행', onRun);
   const btnExport = cardBtn('엑셀 내보내기', onExport, 'btn--secondary');
   btnExport.disabled = true;
-  actionRow.append(btnRun, btnExport);
 
-  header.append(heading, actionRow);
+  header.append(heading);
   page.append(header);
 
   const layout = div('sharedparambatch-layout');
@@ -63,7 +62,7 @@ export function renderSharedParamBatch(root) {
   warningSection.style.display = 'none';
 
   const selectSection = div('section sharedparambatch-section');
-  selectSection.append(sectionHeader('Shared Parameter 선택', []));
+  selectSection.append(sectionHeader('Shared Parameter 선택', [btnRun, btnExport]));
 
   const groupSelect = document.createElement('select');
   groupSelect.className = 'sharedparambatch-select spb-groupSelect';
@@ -119,6 +118,7 @@ export function renderSharedParamBatch(root) {
   const rvtSection = div('section sharedparambatch-section');
   const rvtHeader = sectionHeader('RVT 파일', [
     cardBtn('추가', () => post('sharedparambatch:browse-rvts', {})),
+    cardBtn('폴더 선택', onBrowseFolder),
     cardBtn('선택 삭제', removeSelectedRvts, 'btn--secondary'),
     cardBtn('전체 삭제', clearRvts, 'btn--secondary')
   ]);
@@ -302,6 +302,7 @@ export function renderSharedParamBatch(root) {
       td.textContent = '선택된 파라미터가 없습니다.';
       tr.append(td);
       paramBody.append(tr);
+      updateButtons();
       return;
     }
 
@@ -323,6 +324,7 @@ export function renderSharedParamBatch(root) {
       tr.append(actionTd);
       paramBody.append(tr);
     });
+    updateButtons();
   }
 
   function renderRvtList() {
@@ -352,20 +354,29 @@ export function renderSharedParamBatch(root) {
   }
 
   function handleRvtsPicked(payload) {
+    if (state.pendingFolderBrowse) {
+      ProgressDialog.hide();
+      state.pendingFolderBrowse = false;
+    }
     if (!payload || !payload.ok) {
       if (payload?.message) toast(payload.message, 'err');
       return;
     }
     const paths = Array.isArray(payload.rvtPaths) ? payload.rvtPaths : [];
     let changed = false;
+    let added = 0;
     paths.forEach((p) => {
       if (!state.rvtList.includes(p)) {
         state.rvtList.push(p);
         state.rvtChecked.add(p);
         changed = true;
+        added += 1;
       }
     });
     if (changed) renderRvtList();
+    if (payload?.fromFolder) {
+      toast(added ? `${added}개 추가됨` : '추가된 RVT가 없습니다.', added ? 'ok' : 'err');
+    }
   }
 
   function removeSelectedRvts() {
@@ -379,6 +390,14 @@ export function renderSharedParamBatch(root) {
     state.rvtList = [];
     state.rvtChecked.clear();
     renderRvtList();
+  }
+
+  function onBrowseFolder() {
+    if (state.running) return;
+    state.pendingFolderBrowse = true;
+    ProgressDialog.show('RVT 폴더 선택', '폴더 내 RVT 파일을 찾는 중...');
+    ProgressDialog.update(20, '폴더 내 RVT 파일을 찾는 중...', '');
+    post('sharedparambatch:browse-folder', {});
   }
 
   function onRun() {
@@ -503,8 +522,9 @@ export function renderSharedParamBatch(root) {
 
   function updateButtons() {
     const disabled = state.running;
-    btnRun.disabled = disabled;
+    btnRun.disabled = disabled || !state.selectedParams.length || !state.rvtList.length;
     addBtn.disabled = disabled;
+    btnExport.disabled = disabled || !state.logs.length;
   }
 
   function formatParamGroup(value) {
@@ -595,7 +615,8 @@ export function renderSharedParamBatch(root) {
     const categoryActions = div('sharedparambatch-category-actions');
     const btnAll = cardBtn('전체 선택', () => selectAllCategories(param), 'btn--secondary');
     const btnClear = cardBtn('전체 해제', () => clearAllCategories(param), 'btn--secondary');
-    categoryActions.append(btnAll, btnClear);
+    const btnClearChildren = cardBtn('서브카테고리 해제', () => clearSubCategories(param), 'btn--secondary');
+    categoryActions.append(btnAll, btnClear, btnClearChildren);
     categoryRow.append(categoryActions);
 
     const treeWrap = div('sharedparambatch-category-tree');
@@ -698,10 +719,25 @@ export function renderSharedParamBatch(root) {
     if (modal.body) renderCategoryTree(modal.body.querySelector('.sharedparambatch-category-tree'), param);
   }
 
+  function clearSubCategories(param) {
+    const targets = new Set();
+    collectBindableWithDepth(state.categoryTree, targets, 0);
+    param.settings.categories = param.settings.categories.filter(c => !targets.has(c.path || c.name));
+    const modal = buildSettingsModal;
+    if (modal.body) renderCategoryTree(modal.body.querySelector('.sharedparambatch-category-tree'), param);
+  }
+
   function collectBindable(nodes, out) {
     nodes.forEach((n) => {
       if (n.isBindable) out.push(n);
       if (n.children && n.children.length) collectBindable(n.children, out);
+    });
+  }
+
+  function collectBindableWithDepth(nodes, out, depth) {
+    nodes.forEach((n) => {
+      if (depth >= 1 && n.isBindable) out.add(n.path || n.name);
+      if (n.children && n.children.length) collectBindableWithDepth(n.children, out, depth + 1);
     });
   }
 

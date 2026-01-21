@@ -266,6 +266,26 @@ Namespace Services
             End Using
         End Function
 
+        Public Shared Function BrowseRvtFolder() As Object
+            Dim selectedPath As String = ""
+            Using dlg As New FolderBrowserDialog()
+                dlg.Description = "RVT 폴더 선택"
+                dlg.ShowNewFolderButton = False
+                Dim result = dlg.ShowDialog()
+                If result <> DialogResult.OK Then
+                    Return New With {.ok = False, .message = "폴더 선택이 취소되었습니다."}
+                End If
+                selectedPath = dlg.SelectedPath
+            End Using
+
+            If String.IsNullOrWhiteSpace(selectedPath) OrElse Not Directory.Exists(selectedPath) Then
+                Return New With {.ok = False, .message = "선택된 폴더를 찾을 수 없습니다."}
+            End If
+
+            Dim paths As List(Of String) = CollectRvtFiles(selectedPath)
+            Return New With {.ok = True, .rvtPaths = paths, .fromFolder = True}
+        End Function
+
         Public Shared Function Run(uiapp As UIApplication, payloadJson As String, progress As IProgress(Of Object)) As Object
             If uiapp Is Nothing Then
                 Return New RunResult With {.Ok = False, .Message = "Revit UIApplication이 없습니다."}
@@ -454,6 +474,12 @@ Namespace Services
                 Return New With {.ok = False, .message = "내보낼 로그가 없습니다."}
             End If
 
+            Dim rvtPaths As List(Of String) = ParseStringList(payload, "rvtPaths")
+            Dim parameters As List(Of ParamToBind) = ParseParamList(payload)
+            If rvtPaths.Count = 0 OrElse parameters.Count = 0 Then
+                Return New With {.ok = False, .message = "내보낼 RVT/파라미터 정보가 없습니다."}
+            End If
+
             Dim doAutoFit As Boolean = False
             Try
                 Dim mode As String = TryGetString(payload, "excelMode")
@@ -464,17 +490,50 @@ Namespace Services
                 doAutoFit = False
             End Try
 
-            Dim dt As New DataTable("Logs")
-            dt.Columns.Add("Level")
-            dt.Columns.Add("RVT")
-            dt.Columns.Add("Message")
+            Dim dt As New DataTable("SharedParamBatch")
+            Dim headers As String() = {
+                "파일명",
+                "파라미터명",
+                "GUID",
+                "바인딩",
+                "파라미터 그룹",
+                "성공여부",
+                "메시지"
+            }
+            For Each h As String In headers
+                dt.Columns.Add(h)
+            Next
 
-            For Each l As LogEntry In logs
-                Dim row = dt.NewRow()
-                row("Level") = If(l.Level, String.Empty)
-                row("RVT") = If(l.File, String.Empty)
-                row("Message") = If(l.Message, String.Empty)
-                dt.Rows.Add(row)
+            If Not ValidateExportSchema(dt, headers) Then
+                Return New With {.ok = False, .message = "엑셀 스키마가 올바르지 않습니다."}
+            End If
+
+            Dim statusMap As Dictionary(Of String, LogEntry) = BuildStatusMap(logs)
+
+            For Each rvtPath As String In rvtPaths
+                Dim fileName As String = If(String.IsNullOrWhiteSpace(rvtPath), "", Path.GetFileName(rvtPath))
+                Dim statusEntry As LogEntry = Nothing
+                Dim status As String = "SKIP"
+                Dim message As String = ""
+
+                If Not String.IsNullOrWhiteSpace(rvtPath) AndAlso statusMap.TryGetValue(rvtPath, statusEntry) Then
+                    status = NormalizeStatus(statusEntry.Level)
+                    If String.Equals(status, "FAIL", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(status, "SKIP", StringComparison.OrdinalIgnoreCase) Then
+                        message = If(statusEntry.Message, String.Empty)
+                    End If
+                End If
+
+                For Each p As ParamToBind In parameters
+                    Dim row = dt.NewRow()
+                    row("파일명") = fileName
+                    row("파라미터명") = If(p.ParamName, String.Empty)
+                    row("GUID") = p.GuidString
+                    row("바인딩") = If(p.Settings IsNot Nothing AndAlso p.Settings.IsInstanceBinding, "Instance", "Type")
+                    row("파라미터 그룹") = GetParamGroupLabel(If(p.Settings IsNot Nothing, p.Settings.ParamGroup, BuiltInParameterGroup.INVALID))
+                    row("성공여부") = status
+                    row("메시지") = message
+                    dt.Rows.Add(row)
+                Next
             Next
 
             Dim fileName As String = $"SharedParamBatch_{DateTime.Now:yyyyMMdd_HHmm}.xlsx"
@@ -484,6 +543,125 @@ Namespace Services
             End If
 
             Return New With {.ok = True, .filePath = saved}
+        End Function
+
+        Private Shared Function CollectRvtFiles(rootPath As String) As List(Of String)
+            Dim results As New List(Of String)()
+            Dim seen As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+            Dim stack As New Stack(Of String)()
+            If Not String.IsNullOrWhiteSpace(rootPath) Then stack.Push(rootPath)
+
+            While stack.Count > 0
+                Dim current As String = stack.Pop()
+                Dim subDirs As IEnumerable(Of String) = Enumerable.Empty(Of String)()
+                Dim files As IEnumerable(Of String) = Enumerable.Empty(Of String)()
+
+                Try
+                    subDirs = Directory.EnumerateDirectories(current)
+                Catch
+                End Try
+
+                For Each dir As String In subDirs
+                    stack.Push(dir)
+                Next
+
+                Try
+                    files = Directory.EnumerateFiles(current, "*.rvt")
+                Catch
+                End Try
+
+                For Each f As String In files
+                    If IsBackupRvt(f) Then Continue For
+                    If Not seen.Contains(f) Then
+                        seen.Add(f)
+                        results.Add(f)
+                    End If
+                Next
+            End While
+
+            Return results
+        End Function
+
+        Private Shared Function IsBackupRvt(filePath As String) As Boolean
+            If String.IsNullOrWhiteSpace(filePath) Then Return False
+            Dim nameOnly As String = Path.GetFileNameWithoutExtension(filePath)
+            If String.IsNullOrWhiteSpace(nameOnly) Then Return False
+            Dim idx As Integer = nameOnly.LastIndexOf("."c)
+            If idx < 0 OrElse idx >= nameOnly.Length - 1 Then Return False
+            Dim suffix As String = nameOnly.Substring(idx + 1)
+            If suffix.Length <> 4 Then Return False
+            Return suffix.All(Function(ch) Char.IsDigit(ch))
+        End Function
+
+        Private Shared Function BuildStatusMap(logs As List(Of LogEntry)) As Dictionary(Of String, LogEntry)
+            Dim map As New Dictionary(Of String, LogEntry)(StringComparer.OrdinalIgnoreCase)
+            If logs Is Nothing Then Return map
+
+            For Each l As LogEntry In logs
+                If l Is Nothing Then Continue For
+                Dim path As String = If(l.File, String.Empty)
+                If String.IsNullOrWhiteSpace(path) Then Continue For
+                Dim status As String = NormalizeStatus(l.Level)
+                If status = "" Then Continue For
+
+                Dim existing As LogEntry = Nothing
+                If map.TryGetValue(path, existing) Then
+                    Dim currentRank As Integer = GetStatusRank(status)
+                    Dim existingRank As Integer = GetStatusRank(existing.Level)
+                    If currentRank > existingRank Then
+                        map(path) = New LogEntry With {.Level = status, .File = path, .Message = l.Message}
+                    End If
+                Else
+                    map.Add(path, New LogEntry With {.Level = status, .File = path, .Message = l.Message})
+                End If
+            Next
+
+            Return map
+        End Function
+
+        Private Shared Function NormalizeStatus(level As String) As String
+            If String.IsNullOrWhiteSpace(level) Then Return ""
+            Dim upper As String = level.Trim().ToUpperInvariant()
+            Select Case upper
+                Case "OK", "FAIL", "SKIP"
+                    Return upper
+                Case Else
+                    Return ""
+            End Select
+        End Function
+
+        Private Shared Function GetStatusRank(level As String) As Integer
+            Dim normalized As String = NormalizeStatus(level)
+            Select Case normalized
+                Case "FAIL"
+                    Return 3
+                Case "SKIP"
+                    Return 2
+                Case "OK"
+                    Return 1
+                Case Else
+                    Return 0
+            End Select
+        End Function
+
+        Private Shared Function GetParamGroupLabel(groupValue As BuiltInParameterGroup) As String
+            If groupValue = BuiltInParameterGroup.INVALID Then Return ""
+            Try
+                Return LabelUtils.GetLabelFor(groupValue)
+            Catch
+                Return groupValue.ToString()
+            End Try
+        End Function
+
+        Private Shared Function ValidateExportSchema(dt As DataTable, headers As String()) As Boolean
+            If dt Is Nothing OrElse headers Is Nothing Then Return False
+            If dt.Columns.Count <> headers.Length Then Return False
+            For i As Integer = 0 To headers.Length - 1
+                If Not String.Equals(dt.Columns(i).ColumnName, headers(i), StringComparison.Ordinal) Then
+                    Return False
+                End If
+            Next
+            Return True
         End Function
 
         Private Shared Sub ReportProgress(progress As IProgress(Of Object), stepIndex As Integer, total As Integer, text As String)

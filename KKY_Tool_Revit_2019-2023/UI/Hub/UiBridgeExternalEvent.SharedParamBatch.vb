@@ -14,6 +14,7 @@ Namespace UI.Hub
     Partial Public Class UiBridgeExternalEvent
 
         Private Shared _lastSharedParamBatchResult As SharedParamBatchService.RunResult
+        Private Shared _lastSharedParamBatchPayloadJson As String
 
         Private Sub HandleSharedParamBatchInit(app As UIApplication, payload As Object)
             Try
@@ -35,10 +36,21 @@ Namespace UI.Hub
             End Try
         End Sub
 
+        Private Sub HandleSharedParamBatchBrowseFolder(app As UIApplication, payload As Object)
+            Try
+                Dim res = SharedParamBatchService.BrowseRvtFolder()
+                SendToWeb("sharedparambatch:rvts-picked", res)
+            Catch ex As Exception
+                SendToWeb("sharedparambatch:rvts-picked", New With {.ok = False, .message = ex.Message})
+                SendToWeb("revit:error", New With {.message = ex.Message})
+            End Try
+        End Sub
+
         Private Sub HandleSharedParamBatchRun(app As UIApplication, payload As Object)
             Try
                 Dim serializer As New JavaScriptSerializer()
                 Dim payloadJson As String = serializer.Serialize(payload)
+                _lastSharedParamBatchPayloadJson = payloadJson
 
                 Dim progress As IProgress(Of Object) = New Progress(Of Object)(Sub(p)
                                                                                   SendToWeb("sharedparambatch:progress", p)
@@ -96,9 +108,27 @@ Namespace UI.Hub
                 }).ToList()
 
                 Dim serializer As New JavaScriptSerializer()
+                Dim runPayload As Dictionary(Of String, Object) = Nothing
+                If Not String.IsNullOrWhiteSpace(_lastSharedParamBatchPayloadJson) Then
+                    Try
+                        runPayload = serializer.Deserialize(Of Dictionary(Of String, Object))(_lastSharedParamBatchPayloadJson)
+                    Catch
+                        runPayload = Nothing
+                    End Try
+                End If
+
+                Dim rvtPaths As Object = Nothing
+                Dim parameters As Object = Nothing
+                If runPayload IsNot Nothing Then
+                    runPayload.TryGetValue("rvtPaths", rvtPaths)
+                    runPayload.TryGetValue("parameters", parameters)
+                End If
+
                 Dim payloadJson As String = serializer.Serialize(New With {
                     .logs = logsPayload,
-                    .excelMode = mode
+                    .excelMode = mode,
+                    .rvtPaths = rvtPaths,
+                    .parameters = parameters
                 })
 
                 Dim res = SharedParamBatchService.ExportExcel(payloadJson)
