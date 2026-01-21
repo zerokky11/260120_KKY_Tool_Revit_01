@@ -12,19 +12,6 @@
   gap: 16px;
 }
 
-.spb-topGrid {
-  display: grid;
-  grid-template-columns: 1fr 420px;
-  gap: 16px;
-  align-items: start;
-}
-
-@media (max-width: 980px) {
-  .spb-topGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
 .sharedparambatch-section {
   background: var(--surface-card);
   border-radius: 16px;
@@ -36,15 +23,27 @@
   gap: 12px;
 }
 
-.sharedparambatch-select-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+.spb-cardHeader {
+  display: flex;
+  align-items: center;
   gap: 12px;
+}
+
+.spb-headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.spb-headerRight {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
 }
 
 .spb-defHeader {
   display: grid;
-  grid-template-columns: 110px minmax(180px, 260px) 1fr 120px;
+  grid-template-columns: 110px minmax(180px, 260px) 1fr;
   gap: 10px;
   align-items: center;
 }
@@ -84,9 +83,14 @@
   overflow: auto;
 }
 
-.spb-rvtList {
+.spb-rvtTableWrap {
   max-height: 260px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.spb-modalLarge .spb-rvtTableWrap {
+  max-height: 60vh;
 }
 
 .spb-tableWrap {

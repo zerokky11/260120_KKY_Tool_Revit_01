@@ -62,48 +62,9 @@ export function renderSharedParamBatch(root) {
   warningSection.style.display = 'none';
 
   const selectSection = div('section sharedparambatch-section');
-  selectSection.append(sectionHeader('Shared Parameter 선택', [btnRun, btnExport]));
-
-  const groupSelect = document.createElement('select');
-  groupSelect.className = 'sharedparambatch-select spb-groupSelect';
-  groupSelect.addEventListener('change', () => {
-    state.selectedGroup = groupSelect.value;
-    renderDefinitionList();
-  });
-
-  const searchInput = document.createElement('input');
-  searchInput.type = 'search';
-  searchInput.className = 'sharedparambatch-input spb-search';
-  searchInput.placeholder = '파라미터 검색…';
-  searchInput.addEventListener('input', () => {
-    state.defSearch = (searchInput.value || '').trim();
-    renderDefinitionList();
-  });
-
-  const defHeader = div('spb-defHeader');
-  defHeader.append(labelSpan('Group'), groupSelect, searchInput);
-
-  const addBtn = cardBtn('선택 추가', onAddSelectedDefs);
-  defHeader.append(addBtn);
-
-  const defList = document.createElement('select');
-  defList.className = 'sharedparambatch-def-list spb-defList';
-  defList.multiple = true;
-  defList.addEventListener('change', () => {
-    const next = new Set();
-    Array.from(defList.selectedOptions || []).forEach((opt) => {
-      const guid = opt.dataset.guid;
-      if (guid) next.add(guid);
-    });
-    state.defSelection = next;
-  });
-
-  const defBox = div('sharedparambatch-card');
-  defBox.append(defHeader, defList);
-
-  const selectGrid = div('sharedparambatch-select-grid');
-  selectGrid.append(defBox);
-  selectSection.append(selectGrid);
+  const paramPickerBtn = cardBtn('Parameter 선택하기', openParamPicker, 'btn--secondary');
+  const selectHeader = buildSelectHeader('Shared Parameter 선택', paramPickerBtn, btnRun, btnExport);
+  selectSection.append(selectHeader);
 
   const selectedSection = div('section sharedparambatch-section');
   selectedSection.append(sectionHeader('Selected Parameters', []));
@@ -120,13 +81,17 @@ export function renderSharedParamBatch(root) {
     cardBtn('추가', () => post('sharedparambatch:browse-rvts', {})),
     cardBtn('폴더 선택', onBrowseFolder),
     cardBtn('선택 삭제', removeSelectedRvts, 'btn--secondary'),
-    cardBtn('전체 삭제', clearRvts, 'btn--secondary')
+    cardBtn('전체 삭제', clearRvts, 'btn--secondary'),
+    cardBtn('리스트 크게보기', openRvtModal, 'btn--secondary')
   ]);
   rvtSection.append(rvtHeader);
   const { table: rvtTable, tbody: rvtBody, master: rvtMaster } = createRvtTable();
-  const rvtListWrap = div('spb-rvtList');
+  const rvtListWrap = div('spb-rvtTableWrap');
   rvtListWrap.append(rvtTable);
   rvtSection.append(rvtListWrap);
+
+  const rvtModal = buildRvtModal();
+  const paramPickerModal = buildParamPickerModal();
 
   const optionsSection = div('section sharedparambatch-section');
   optionsSection.append(sectionHeader('Options', []));
@@ -179,11 +144,9 @@ export function renderSharedParamBatch(root) {
 
   resultSection.append(summaryRow, logPathRow, logTable);
 
-  const topGrid = div('spb-topGrid');
-  topGrid.append(selectSection, rvtSection);
-  layout.append(warningSection, topGrid, selectedSection, optionsSection, resultSection);
+  layout.append(warningSection, selectSection, selectedSection, rvtSection, optionsSection, resultSection);
   page.append(layout);
-  page.append(buildSettingsModal());
+  page.append(buildSettingsModal(), paramPickerModal, rvtModal);
 
   target.append(page);
 
@@ -216,6 +179,9 @@ export function renderSharedParamBatch(root) {
   }
 
   function renderGroupOptions() {
+    const modal = buildParamPickerModal;
+    const groupSelect = modal.groupSelect;
+    if (!groupSelect) return;
     groupSelect.innerHTML = '';
     if (!state.groups.length) {
       const opt = document.createElement('option');
@@ -236,6 +202,9 @@ export function renderSharedParamBatch(root) {
   }
 
   function renderDefinitionList() {
+    const modal = buildParamPickerModal;
+    const defList = modal.defList;
+    if (!defList) return;
     defList.innerHTML = '';
     const defs = state.defsByGroup[state.selectedGroup] || [];
     const search = (state.defSearch || '').toLowerCase();
@@ -263,8 +232,18 @@ export function renderSharedParamBatch(root) {
     });
   }
 
+  function openParamPicker() {
+    const modal = buildParamPickerModal;
+    if (modal.searchInput) modal.searchInput.value = state.defSearch || '';
+    if (modal.groupSelect) modal.groupSelect.value = state.selectedGroup || '';
+    renderDefinitionList();
+    if (modal.overlay) modal.overlay.classList.add('is-open');
+  }
+
   function onAddSelectedDefs() {
-    if (!defList.options.length) return;
+    const modal = buildParamPickerModal;
+    const defList = modal.defList;
+    if (!defList || !defList.options.length) return;
     const selected = Array.from(defList.selectedOptions || []);
     if (!selected.length) { toast('추가할 파라미터를 선택하세요.', 'err'); return; }
 
@@ -329,14 +308,17 @@ export function renderSharedParamBatch(root) {
 
   function renderRvtList() {
     const allChecked = state.rvtList.length > 0 && state.rvtList.every(f => state.rvtChecked.has(f));
-    rvtMaster.checked = allChecked;
-    rvtMaster.disabled = state.rvtList.length === 0;
-    rvtMaster.onchange = () => {
-      if (rvtMaster.checked) state.rvtChecked = new Set(state.rvtList);
-      else state.rvtChecked.clear();
-      renderRvtList();
-      updateButtons();
-    };
+    [rvtMaster, buildRvtModal.master].forEach((master) => {
+      if (!master) return;
+      master.checked = allChecked;
+      master.disabled = state.rvtList.length === 0;
+      master.onchange = () => {
+        if (master.checked) state.rvtChecked = new Set(state.rvtList);
+        else state.rvtChecked.clear();
+        renderRvtList();
+        updateButtons();
+      };
+    });
     const rows = state.rvtList.map((p, idx) => ({
       checked: state.rvtChecked.has(p),
       index: idx + 1,
@@ -350,6 +332,9 @@ export function renderSharedParamBatch(root) {
       }
     }));
     renderRvtRows(rvtBody, rows);
+    if (buildRvtModal.tbody) {
+      renderRvtRows(buildRvtModal.tbody, rows);
+    }
     updateButtons();
   }
 
@@ -523,8 +508,9 @@ export function renderSharedParamBatch(root) {
   function updateButtons() {
     const disabled = state.running;
     btnRun.disabled = disabled || !state.selectedParams.length || !state.rvtList.length;
-    addBtn.disabled = disabled;
     btnExport.disabled = disabled || !state.logs.length;
+    const modal = buildParamPickerModal;
+    if (modal.addBtn) modal.addBtn.disabled = disabled;
   }
 
   function formatParamGroup(value) {
@@ -558,6 +544,132 @@ export function renderSharedParamBatch(root) {
     buildSettingsModal.currentIndex = -1;
 
     return overlay;
+  }
+
+  function buildSelectHeader(titleText, pickerButton, runButton, exportButton) {
+    const header = div('spb-cardHeader');
+    const left = div('spb-headerLeft');
+    const title = document.createElement('h3');
+    title.textContent = titleText;
+    left.append(title, pickerButton);
+    const right = div('spb-headerRight');
+    right.append(runButton, exportButton);
+    header.append(left, right);
+    return header;
+  }
+
+  function buildParamPickerModal() {
+    const overlay = div('sharedparambatch-modal-overlay');
+    const modal = div('sharedparambatch-modal');
+    const header = div('sharedparambatch-modal__header');
+    const title = div('sharedparambatch-modal__title');
+    title.textContent = '파라미터 선택';
+    const closeBtn = actionBtn('닫기', closeParamPicker, 'btn--ghost');
+    header.append(title, closeBtn);
+
+    const body = div('sharedparambatch-modal__body');
+    const footer = div('sharedparambatch-modal__footer');
+    const addBtn = cardBtn('선택 추가', onAddSelectedDefs);
+    const closeBtn2 = cardBtn('닫기', closeParamPicker, 'btn--secondary');
+    footer.append(addBtn, closeBtn2);
+
+    const groupSelect = document.createElement('select');
+    groupSelect.className = 'sharedparambatch-select spb-groupSelect';
+    groupSelect.addEventListener('change', () => {
+      state.selectedGroup = groupSelect.value;
+      renderDefinitionList();
+    });
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.className = 'sharedparambatch-input spb-search';
+    searchInput.placeholder = '파라미터 검색…';
+    searchInput.addEventListener('input', () => {
+      state.defSearch = (searchInput.value || '').trim();
+      renderDefinitionList();
+    });
+
+    const defHeader = div('spb-defHeader');
+    defHeader.append(labelSpan('Group'), groupSelect, searchInput);
+
+    const defList = document.createElement('select');
+    defList.className = 'sharedparambatch-def-list spb-defList';
+    defList.multiple = true;
+    defList.addEventListener('change', () => {
+      const next = new Set();
+      Array.from(defList.selectedOptions || []).forEach((opt) => {
+        const guid = opt.dataset.guid;
+        if (guid) next.add(guid);
+      });
+      state.defSelection = next;
+    });
+
+    const defBox = div('sharedparambatch-card');
+    defBox.append(defHeader, defList);
+
+    body.append(defBox);
+    modal.append(header, body, footer);
+    overlay.append(modal);
+
+    overlay.addEventListener('click', (ev) => { if (ev.target === overlay) closeParamPicker(); });
+
+    buildParamPickerModal.overlay = overlay;
+    buildParamPickerModal.groupSelect = groupSelect;
+    buildParamPickerModal.defList = defList;
+    buildParamPickerModal.searchInput = searchInput;
+    buildParamPickerModal.addBtn = addBtn;
+
+    return overlay;
+  }
+
+  function closeParamPicker() {
+    const modal = buildParamPickerModal;
+    if (modal.overlay) modal.overlay.classList.remove('is-open');
+  }
+
+  function buildRvtModal() {
+    const overlay = div('sharedparambatch-modal-overlay');
+    const modal = div('sharedparambatch-modal spb-modalLarge');
+    const header = div('sharedparambatch-modal__header');
+    const title = div('sharedparambatch-modal__title');
+    title.textContent = 'RVT 파일 목록';
+    const closeBtn = actionBtn('닫기', closeRvtModal, 'btn--ghost');
+    header.append(title, closeBtn);
+
+    const body = div('sharedparambatch-modal__body');
+    const actions = div('section-actions');
+    actions.append(
+      cardBtn('추가', () => post('sharedparambatch:browse-rvts', {})),
+      cardBtn('폴더 선택', onBrowseFolder),
+      cardBtn('선택 삭제', removeSelectedRvts, 'btn--secondary'),
+      cardBtn('전체 삭제', clearRvts, 'btn--secondary')
+    );
+    const { table, tbody, master } = createRvtTable();
+    const wrap = div('spb-rvtTableWrap');
+    wrap.append(table);
+    body.append(actions, wrap);
+
+    modal.append(header, body);
+    overlay.append(modal);
+
+    overlay.addEventListener('click', (ev) => { if (ev.target === overlay) closeRvtModal(); });
+
+    buildRvtModal.overlay = overlay;
+    buildRvtModal.tbody = tbody;
+    buildRvtModal.master = master;
+
+    return overlay;
+  }
+
+  function openRvtModal() {
+    const modal = buildRvtModal;
+    if (modal.overlay) modal.overlay.classList.add('is-open');
+    renderRvtList();
+  }
+
+  function closeRvtModal() {
+    const modal = buildRvtModal;
+    if (modal.overlay) modal.overlay.classList.remove('is-open');
   }
 
   function openSettingsModal(index) {
