@@ -43,6 +43,7 @@ Namespace Services
         End Class
 
         Public Class ParamGroupOption
+            Public Property Key As String = String.Empty
             Public Property Id As String = String.Empty
             Public Property Label As String = String.Empty
         End Class
@@ -744,8 +745,24 @@ Namespace Services
                     label = key
                 End Try
 
-                opts.Add(New ParamGroupOption With {.Id = key, .Label = label})
+                opts.Add(New ParamGroupOption With {.Key = key, .Id = key, .Label = label})
             Next
+
+            Dim hasOther As Boolean = opts.Any(Function(o) String.Equals(o.Id, "PG_OTHER", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(o.Key, "PG_OTHER", StringComparison.OrdinalIgnoreCase))
+            If Not hasOther Then
+                Try
+                    Dim otherKey As String = "PG_OTHER"
+                    Dim otherLabel As String = "Other"
+                    Try
+                        Dim otherEnum As BuiltInParameterGroup = CType([Enum].Parse(GetType(BuiltInParameterGroup), otherKey), BuiltInParameterGroup)
+                        otherLabel = LabelUtils.GetLabelFor(otherEnum)
+                    Catch
+                        otherLabel = "Other"
+                    End Try
+                    opts.Add(New ParamGroupOption With {.Key = otherKey, .Id = otherKey, .Label = otherLabel})
+                Catch
+                End Try
+            End If
 
             Return opts.OrderBy(Function(o) o.Label).ToList()
         End Function

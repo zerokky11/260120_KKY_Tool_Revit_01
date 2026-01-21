@@ -67,7 +67,8 @@ export function renderSharedParamBatch(root) {
   selectSection.append(selectHeader);
 
   const selectedSection = div('section sharedparambatch-section');
-  selectedSection.append(sectionHeader('Selected Parameters', []));
+  const bulkApplyBtn = cardBtn('설정 일괄 적용', applyBulkSettings, 'btn--secondary');
+  selectedSection.append(sectionHeader('Selected Parameters', [bulkApplyBtn]));
   const paramTable = document.createElement('table');
   paramTable.className = 'sharedparambatch-table';
   paramTable.innerHTML = '<thead><tr><th>Name</th><th>GUID</th><th>Binding</th><th>Group</th><th>Categories</th><th>Action</th></tr></thead><tbody></tbody>';
@@ -92,12 +93,23 @@ export function renderSharedParamBatch(root) {
   rvtHeaderLeft.append(rvtTitle, rvtActions);
 
   const rvtHeaderRight = div('spb-rvtHeaderRight');
+  const closeWrap = document.createElement('label');
+  closeWrap.className = 'spb-inlineCheck';
+  const closeChk = document.createElement('input');
+  closeChk.type = 'checkbox';
+  closeChk.checked = true;
+  closeChk.id = 'spb-close-worksets';
+  closeChk.addEventListener('change', () => { state.options.closeAllWorksetsOnOpen = !!closeChk.checked; });
+  const closeLbl = document.createElement('span');
+  closeLbl.textContent = 'Workshared: Open CloseAllWorksets';
+  closeWrap.append(closeChk, closeLbl);
+
   const syncInput = document.createElement('input');
   syncInput.type = 'text';
   syncInput.className = 'sharedparambatch-input spb-syncInput';
   syncInput.placeholder = 'Sync Comment';
   syncInput.addEventListener('input', () => { state.options.syncComment = syncInput.value || ''; });
-  rvtHeaderRight.append(labelSpan('Sync Comment'), syncInput);
+  rvtHeaderRight.append(closeWrap, labelSpan('Sync Comment'), syncInput);
 
   rvtHeader.append(rvtHeaderLeft, rvtHeaderRight);
   rvtSection.append(rvtHeader);
@@ -108,23 +120,6 @@ export function renderSharedParamBatch(root) {
 
   const rvtModal = buildRvtModal();
   const paramPickerModal = buildParamPickerModal();
-
-  const optionsSection = div('section sharedparambatch-section');
-  optionsSection.append(sectionHeader('Options', []));
-  const optionsGrid = div('sharedparambatch-options');
-  const closeWrap = div('sharedparambatch-option');
-  const closeChk = document.createElement('input');
-  closeChk.type = 'checkbox';
-  closeChk.checked = true;
-  closeChk.id = 'spb-close-worksets';
-  closeChk.addEventListener('change', () => { state.options.closeAllWorksetsOnOpen = !!closeChk.checked; });
-  const closeLbl = document.createElement('label');
-  closeLbl.setAttribute('for', 'spb-close-worksets');
-  closeLbl.textContent = 'Workshared: Open CloseAllWorksets';
-  closeWrap.append(closeChk, closeLbl);
-
-  optionsGrid.append(closeWrap);
-  optionsSection.append(optionsGrid);
 
   const resultSection = div('sharedparambatch-result');
   const resultHeader = sectionHeader('최근 실행 결과', []);
@@ -154,7 +149,7 @@ export function renderSharedParamBatch(root) {
   resultSection.style.display = 'none';
 
   selectSection.append(resultSection);
-  layout.append(warningSection, selectSection, selectedSection, rvtSection, optionsSection);
+  layout.append(warningSection, selectSection, selectedSection, rvtSection);
   page.append(layout);
   page.append(buildSettingsModal(), paramPickerModal, rvtModal);
 
@@ -184,6 +179,7 @@ export function renderSharedParamBatch(root) {
     state.categoryTree = Array.isArray(payload.categoryTree) ? payload.categoryTree : [];
     state.paramGroups = Array.isArray(payload.paramGroups) ? payload.paramGroups : [];
     if (syncInput) syncInput.value = state.options.syncComment || '';
+    closeChk.checked = !!state.options.closeAllWorksetsOnOpen;
     renderGroupOptions();
     renderDefinitionList();
     renderSelectedParams();
@@ -523,12 +519,38 @@ export function renderSharedParamBatch(root) {
     btnExport.disabled = disabled || !state.logs.length;
     const modal = buildParamPickerModal;
     if (modal.addBtn) modal.addBtn.disabled = disabled;
+    bulkApplyBtn.disabled = disabled || state.selectedParams.length < 2;
   }
 
   function formatParamGroup(value) {
-    const match = state.paramGroups.find(g => g.id === value || g.Id === value);
+    const match = state.paramGroups.find(g => g.key === value || g.Key === value || g.id === value || g.Id === value);
     if (match) return match.label || match.Label || value || '';
     return value || '';
+  }
+
+  function applyBulkSettings() {
+    if (state.selectedParams.length < 2) return;
+    const template = state.selectedParams[0]?.settings;
+    if (!template) return;
+    const cloned = cloneSettings(template);
+    state.selectedParams.forEach((p, idx) => {
+      if (idx === 0 || !p) return;
+      p.settings = cloneSettings(cloned);
+    });
+    renderSelectedParams();
+  }
+
+  function cloneSettings(src) {
+    return {
+      isInstanceBinding: !!src.isInstanceBinding,
+      paramGroup: src.paramGroup,
+      allowVaryBetweenGroups: !!src.allowVaryBetweenGroups,
+      categories: Array.isArray(src.categories) ? src.categories.map(c => ({
+        idInt: c.idInt,
+        name: c.name,
+        path: c.path
+      })) : []
+    };
   }
 
   function buildSettingsModal() {
@@ -713,7 +735,7 @@ export function renderSharedParamBatch(root) {
     groupSelectEl.className = 'sharedparambatch-select';
     state.paramGroups.forEach((g) => {
       const opt = document.createElement('option');
-      opt.value = g.id || g.Id;
+      opt.value = g.key || g.Key || g.id || g.Id;
       opt.textContent = g.label || g.Label || opt.value;
       groupSelectEl.append(opt);
     });
