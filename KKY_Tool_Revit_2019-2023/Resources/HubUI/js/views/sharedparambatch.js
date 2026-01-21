@@ -36,9 +36,9 @@ export function renderSharedParamBatch(root) {
   const header = div('feature-header');
   const heading = div('feature-heading');
   heading.innerHTML = `
-    <span class="feature-kicker">Shared Parameter Batch</span>
-    <h2 class="feature-title">공유 파라미터 배치 바인딩</h2>
-    <p class="feature-sub">Shared Parameter를 선택하고 여러 RVT에 배치로 바인딩합니다.</p>`;
+    <span class="feature-kicker">Project Parameter</span>
+    <h2 class="feature-title">Project Parameter 추가 (Project/Shared)</h2>
+    <p class="feature-sub">Project/Shared 파라미터를 여러 RVT에 일괄 추가/바인딩합니다.</p>`;
 
   const actionRow = div('feature-actions');
   const btnRun = cardBtn('실행', onRun);
@@ -53,7 +53,7 @@ export function renderSharedParamBatch(root) {
   page.append(layout);
 
   const sourceSection = div('section sharedparambatch-section');
-  sourceSection.append(sectionHeader('Shared Parameter Source', [
+  sourceSection.append(sectionHeader('Project/Shared Parameter Source', [
     cardBtn('새로고침', () => post('sharedparambatch:init', {}), 'btn--secondary')
   ]));
   const sourceBody = div('sharedparambatch-source');
@@ -384,7 +384,7 @@ export function renderSharedParamBatch(root) {
 
     state.running = true;
     updateButtons();
-    ProgressDialog.show('Shared Param Batch', '작업 준비 중...');
+    ProgressDialog.show('Project Parameter 추가', '작업 준비 중...');
     ProgressDialog.update(0, '작업 준비 중...', '');
     post('sharedparambatch:run', payload);
   }
@@ -399,7 +399,7 @@ export function renderSharedParamBatch(root) {
     const percentRaw = Number.isFinite(payload.percent) ? Number(payload.percent) : (Number.isFinite(percentFromPhase) && percentFromPhase > 0 ? percentFromPhase : percentFromStep);
     const pct = Math.max(0, Math.min(100, percentRaw || 0));
     state.lastProgressPct = pct;
-    ProgressDialog.show('Shared Param Batch', text || '진행 중');
+    ProgressDialog.show('Project Parameter 추가', text || '진행 중');
     ProgressDialog.update(pct, text || '진행 중', total ? `${step} / ${total}` : '');
     if (pct >= 100) ProgressDialog.hide();
   }

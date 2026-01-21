@@ -16,7 +16,6 @@ const GROUP_FILTER_KEY = 'kky.hub.multiGroupFilter';
 const GROUPS = [
   { id: 'all', label: '전체' },
   { id: 'bqc', label: '납품 시 BQC 검토' },
-  { id: 'periodic', label: '주기적 검토' },
   { id: 'utility', label: '유틸리티' }
 ];
 
@@ -75,8 +74,8 @@ export function renderMulti(root) {
   header.innerHTML = `
     <div class="feature-heading">
       <span class="feature-kicker">Multi RVT Hub</span>
-      <h2 class="feature-title">다중 RVT 검토 허브</h2>
-      <p class="feature-sub">파일별로 열고 선택된 기능을 순차 실행합니다.</p>
+    <h2 class="feature-title">납품시 BQC 검토</h2>
+    <p class="feature-sub">납품 검토를 위한 유틸리티 기능을 모아 실행합니다.</p>
     </div>`;
   page.append(header);
 
@@ -85,17 +84,17 @@ export function renderMulti(root) {
   const rightCol = div('multi-right HubRight');
 
   const group1 = buildGroupSection('납품 시 BQC 검토', '커넥터 진단 (BQC용)', 'bqc');
-  const group2 = buildGroupSection('주기적 검토', 'PMS / GUID / 파라미터 연동', 'periodic');
-  const group3 = buildGroupSection('유틸리티', '공유 파라미터 연동 / Point 추출', 'utility');
+  const group3 = buildGroupSection('유틸리티', 'PMS / GUID / 패밀리 연동 / Point 추출 / Project Parameter', 'utility');
+  group3.section.id = 'utilities';
 
   const group1Options = buildGroup1Options();
   group1.section.append(group1Options);
   group1.section.append(buildToggleRow('connector', buildConnectorConfig()));
-  group2.section.append(buildPmsWorkflowRow());
-  group2.section.append(buildToggleRow('guid', buildGuidConfig()));
-  group3.section.append(buildSharedParamBatchRow());
+  group3.section.append(buildPmsWorkflowRow());
+  group3.section.append(buildToggleRow('guid', buildGuidConfig()));
   group3.section.append(buildToggleRow('familylink', buildFamilyLinkConfig()));
   group3.section.append(buildToggleRow('points', buildPointsConfig()));
+  group3.section.append(buildSharedParamBatchRow());
 
   const rightFilter = buildGroupFilter();
   const leftTop = div('left-sticky HubLeftTop');
@@ -103,7 +102,7 @@ export function renderMulti(root) {
   const leftSelected = div('HubLeftSelected');
   leftSelected.append(buildSelectedFeaturesSection());
   leftCol.append(leftTop, leftSelected, buildRvtSection());
-  rightCol.append(rightFilter, group1.wrap, group2.wrap, group3.wrap);
+  rightCol.append(rightFilter, group1.wrap, group3.wrap);
   layout.append(leftCol, rightCol);
   page.append(layout);
   page.append(buildSettingsModal());
@@ -139,7 +138,7 @@ export function renderMulti(root) {
     const pct = Math.max(0, Math.min(100, pctValue));
     state.ui.lastProgressPct = pct;
     const phase = String(payload?.phase || payload?.Phase || '').toLowerCase();
-    ProgressDialog.show(payload?.title || '다중 RVT 검토', payload?.message || '');
+    ProgressDialog.show(payload?.title || '납품시 BQC 검토', payload?.message || '');
     ProgressDialog.update(pct, payload?.message || '', payload?.detail || '');
     updateRunProgress(pct, payload?.message || '', payload?.detail || '');
     if (phase === 'done' || pct >= 100) {
@@ -401,9 +400,9 @@ export function renderMulti(root) {
     icon.className = 'feature-row__icon';
     icon.textContent = 'SP';
     const title = document.createElement('strong');
-    title.textContent = 'Shared Param Batch';
+    title.textContent = 'Project Parameter 추가 (Project/Shared)';
     const desc = document.createElement('span');
-    desc.textContent = '다중 RVT Shared Parameter 바인딩/Sync/Save';
+    desc.textContent = 'Project/Shared 파라미터를 여러 RVT에 일괄 추가/바인딩합니다.';
     left.append(icon, title, desc);
 
     const right = div('feature-row__right');
@@ -1150,7 +1149,7 @@ export function renderMulti(root) {
       }
     }
     setBusyState(true);
-    ProgressDialog.show('다중 RVT 검토', '준비 중...');
+    ProgressDialog.show('납품시 BQC 검토', '준비 중...');
     ProgressDialog.update(0, '준비 중...', '');
     post('hub:multi-run', buildPayload());
   }

@@ -24,8 +24,8 @@ export function renderHome(root) {
             ]
         ),
         buildCard(
-            '다중 RVT 검토',
-            '여러 RVT 파일을 등록하고 배치 검토 및 엑셀 추출을 실행합니다.',
+            '납품시 BQC 검토',
+            '납품 기준에 맞춰 유틸리티 도구를 실행합니다.',
             'multi',
             [
                 '파라미터 값 연속성 검토: 연결된 객체들의 파라미터 값 연속성 검토',
@@ -33,13 +33,23 @@ export function renderHome(root) {
                 '패밀리 공유파라미터 연동 검토: 복합 패밀리 연동 상태 점검',
                 'Point 추출: Project/Survey 포인트 좌표 추출'
             ]
+        ),
+        buildCard(
+            '유틸리티',
+            '납품시 BQC 검토 유틸리티 도구 모음',
+            'multi',
+            [
+                'PMS 검토: Segment ↔ PMS 매핑 및 사이즈 검토',
+                'GUID/연동/Point 추출/Project Parameter 추가',
+            ],
+            'utilities'
         )
     );
 
     view.append(hero, grid);
     target.append(view);
 
-    function buildCard(title, desc, hash, items) {
+    function buildCard(title, desc, hash, items, anchorId) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className = 'home-choice-card';
@@ -56,7 +66,17 @@ export function renderHome(root) {
               <span class="home-choice-card__icon">→</span>
             </div>
             <span class="home-choice-cta btn btn--primary">바로가기</span>`;
-        card.addEventListener('click', () => { location.hash = `#${hash}`; });
+        card.addEventListener('click', () => {
+            location.hash = `#${hash}`;
+            if (anchorId) {
+                setTimeout(() => {
+                    const el = document.getElementById(anchorId);
+                    if (el && el.scrollIntoView) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 240);
+            }
+        });
         return card;
     }
 }
