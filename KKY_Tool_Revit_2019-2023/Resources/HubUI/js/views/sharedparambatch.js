@@ -77,13 +77,29 @@ export function renderSharedParamBatch(root) {
   selectedSection.append(paramWrap);
 
   const rvtSection = div('section sharedparambatch-section');
-  const rvtHeader = sectionHeader('RVT 파일', [
+  const rvtHeader = div('spb-rvtHeader');
+  const rvtHeaderLeft = div('spb-rvtHeaderLeft');
+  const rvtTitle = document.createElement('h3');
+  rvtTitle.textContent = 'RVT 파일';
+  const rvtActions = div('section-actions');
+  rvtActions.append(
     cardBtn('추가', () => post('sharedparambatch:browse-rvts', {})),
     cardBtn('폴더 선택', onBrowseFolder),
     cardBtn('선택 삭제', removeSelectedRvts, 'btn--secondary'),
     cardBtn('전체 삭제', clearRvts, 'btn--secondary'),
     cardBtn('리스트 크게보기', openRvtModal, 'btn--secondary')
-  ]);
+  );
+  rvtHeaderLeft.append(rvtTitle, rvtActions);
+
+  const rvtHeaderRight = div('spb-rvtHeaderRight');
+  const syncInput = document.createElement('input');
+  syncInput.type = 'text';
+  syncInput.className = 'sharedparambatch-input spb-syncInput';
+  syncInput.placeholder = 'Sync Comment';
+  syncInput.addEventListener('input', () => { state.options.syncComment = syncInput.value || ''; });
+  rvtHeaderRight.append(labelSpan('Sync Comment'), syncInput);
+
+  rvtHeader.append(rvtHeaderLeft, rvtHeaderRight);
   rvtSection.append(rvtHeader);
   const { table: rvtTable, tbody: rvtBody, master: rvtMaster } = createRvtTable();
   const rvtListWrap = div('spb-rvtTableWrap');
@@ -107,19 +123,11 @@ export function renderSharedParamBatch(root) {
   closeLbl.textContent = 'Workshared: Open CloseAllWorksets';
   closeWrap.append(closeChk, closeLbl);
 
-  const syncWrap = div('sharedparambatch-option');
-  const syncInput = document.createElement('input');
-  syncInput.type = 'text';
-  syncInput.className = 'sharedparambatch-input';
-  syncInput.placeholder = 'Sync Comment';
-  syncInput.addEventListener('input', () => { state.options.syncComment = syncInput.value || ''; });
-  syncWrap.append(labelSpan('Sync Comment'), syncInput);
-
-  optionsGrid.append(closeWrap, syncWrap);
+  optionsGrid.append(closeWrap);
   optionsSection.append(optionsGrid);
 
-  const resultSection = div('section sharedparambatch-section');
-  const resultHeader = sectionHeader('결과', []);
+  const resultSection = div('sharedparambatch-result');
+  const resultHeader = sectionHeader('최근 실행 결과', []);
   resultSection.append(resultHeader);
   const summaryRow = div('sharedparambatch-summary');
   const badgeOk = summaryBadge('OK', '0');
@@ -143,8 +151,10 @@ export function renderSharedParamBatch(root) {
   const logBody = logTable.querySelector('tbody');
 
   resultSection.append(summaryRow, logPathRow, logTable);
+  resultSection.style.display = 'none';
 
-  layout.append(warningSection, selectSection, selectedSection, rvtSection, optionsSection, resultSection);
+  selectSection.append(resultSection);
+  layout.append(warningSection, selectSection, selectedSection, rvtSection, optionsSection);
   page.append(layout);
   page.append(buildSettingsModal(), paramPickerModal, rvtModal);
 
@@ -173,6 +183,7 @@ export function renderSharedParamBatch(root) {
     state.defsByGroup = payload.defsByGroup || {};
     state.categoryTree = Array.isArray(payload.categoryTree) ? payload.categoryTree : [];
     state.paramGroups = Array.isArray(payload.paramGroups) ? payload.paramGroups : [];
+    if (syncInput) syncInput.value = state.options.syncComment || '';
     renderGroupOptions();
     renderDefinitionList();
     renderSelectedParams();
@@ -481,6 +492,7 @@ export function renderSharedParamBatch(root) {
     logPathText.textContent = state.logTextPath ? `로그 파일: ${state.logTextPath}` : '로그 파일: -';
     logOpenBtn.disabled = !state.logTextPath;
     btnExport.disabled = !state.logs.length;
+    resultSection.style.display = state.logs.length ? 'flex' : 'none';
   }
 
   function renderLogs() {

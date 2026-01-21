@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
+  height: 100%;
   min-height: 0;
 }
 
@@ -87,6 +88,31 @@
   max-height: 260px;
   overflow-y: auto;
   overflow-x: auto;
+}
+
+.spb-rvtHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.spb-rvtHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.spb-rvtHeaderRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spb-syncInput {
+  width: 320px;
+  max-width: 100%;
 }
 
 .spb-modalLarge .spb-rvtTableWrap {
