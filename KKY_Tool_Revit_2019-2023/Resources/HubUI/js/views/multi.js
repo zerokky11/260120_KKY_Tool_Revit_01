@@ -13,6 +13,7 @@ const FEATURE_META = {
 const FEATURE_KEYS = Object.keys(FEATURE_META);
 const COMMON_OPTIONS_KEY = 'kky.hub.commonOptions';
 const GROUP_FILTER_KEY = 'kky.hub.multiGroupFilter';
+const MULTI_MODE_KEY = 'kky.hub.multiMode';
 const GROUPS = [
   { id: 'all', label: '전체' },
   { id: 'bqc', label: '납품 시 BQC 검토' },
@@ -24,6 +25,8 @@ export function renderMulti(root) {
   clear(target);
   const top = document.querySelector('#topbar-root .topbar') || document.querySelector('.topbar');
   if (top) top.classList.add('hub-topbar');
+
+  const multiMode = normalizeMultiMode(getMultiMode());
 
   const state = {
     rvtList: [],
@@ -59,6 +62,7 @@ export function renderMulti(root) {
       selectedTableBody: null,
       selectedRows: new Map(),
       groupFilter: 'all',
+      multiMode: multiMode,
       isRvtListExpanded: false,
       reviewSummaryData: null
     }
@@ -71,12 +75,7 @@ export function renderMulti(root) {
   const page = div('feature-shell multi-page HubShell');
   const hasLocalCommonOptions = loadCommonOptionsFromStorage();
   const header = div('feature-header multi-header');
-  header.innerHTML = `
-    <div class="feature-heading">
-      <span class="feature-kicker">Multi RVT Hub</span>
-    <h2 class="feature-title">납품시 BQC 검토</h2>
-    <p class="feature-sub">납품 검토를 위한 유틸리티 기능을 모아 실행합니다.</p>
-    </div>`;
+  header.innerHTML = buildHeaderHtml(state.ui.multiMode);
   page.append(header);
 
   const layout = div('multi-layout HubBody');
@@ -95,14 +94,25 @@ export function renderMulti(root) {
   group3.section.append(buildToggleRow('familylink', buildFamilyLinkConfig()));
   group3.section.append(buildToggleRow('points', buildPointsConfig()));
   group3.section.append(buildSharedParamBatchRow());
+  if (state.ui.multiMode === 'bqc' && group1.section.querySelectorAll('.feature-row').length === 0) {
+    const empty = div('feature-note');
+    empty.textContent = '등록된 BQC 검토 기능이 없습니다.';
+    group1.section.append(empty);
+  }
 
+  state.ui.groupFilter = state.ui.multiMode;
+  saveGroupFilter(state.ui.multiMode);
   const rightFilter = buildGroupFilter();
   const leftTop = div('left-sticky HubLeftTop');
   leftTop.append(buildRunBar());
   const leftSelected = div('HubLeftSelected');
   leftSelected.append(buildSelectedFeaturesSection());
   leftCol.append(leftTop, leftSelected, buildRvtSection());
-  rightCol.append(rightFilter, group1.wrap, group3.wrap);
+  if (state.ui.multiMode === 'bqc') {
+    rightCol.append(rightFilter, group1.wrap);
+  } else {
+    rightCol.append(rightFilter, group3.wrap);
+  }
   layout.append(leftCol, rightCol);
   page.append(layout);
   page.append(buildSettingsModal());
@@ -229,6 +239,36 @@ export function renderMulti(root) {
     post('sharedparam:list', { source: 'multi', context: context || '' });
   }
 
+  function normalizeMultiMode(value) {
+    if (value === 'utility') return 'utility';
+    return 'bqc';
+  }
+
+  function getMultiMode() {
+    try {
+      return localStorage.getItem(MULTI_MODE_KEY) || 'bqc';
+    } catch {
+      return 'bqc';
+    }
+  }
+
+  function buildHeaderHtml(mode) {
+    if (mode === 'utility') {
+      return `
+    <div class="feature-heading">
+      <span class="feature-kicker">Utilities</span>
+      <h2 class="feature-title">유틸리티</h2>
+      <p class="feature-sub">납품시 BQC 검토 유틸리티 도구 모음입니다.</p>
+    </div>`;
+    }
+    return `
+    <div class="feature-heading">
+      <span class="feature-kicker">Multi RVT Hub</span>
+      <h2 class="feature-title">납품시 BQC 검토</h2>
+      <p class="feature-sub">납품 검토를 위한 유틸리티 기능을 모아 실행합니다.</p>
+    </div>`;
+  }
+
   function buildGroupSection(title, desc, groupId) {
     const wrap = div('multi-section');
     if (groupId) wrap.dataset.group = groupId;
@@ -242,7 +282,10 @@ export function renderMulti(root) {
     const wrap = div('group-filter');
     const stored = getGroupFilter();
     state.ui.groupFilter = stored;
+    const mode = state.ui.multiMode || 'bqc';
+    const allowed = mode === 'utility' ? ['utility'] : ['bqc'];
     GROUPS.forEach((group) => {
+      if (group.id !== 'all' && !allowed.includes(group.id)) return;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'group-filter__btn';
@@ -1578,10 +1621,12 @@ export function renderMulti(root) {
 
   function renderGroupVisibility() {
     const filter = state.ui.groupFilter || 'all';
+    const mode = state.ui.multiMode || 'bqc';
     const sections = rightCol.querySelectorAll('.multi-section');
     sections.forEach((section) => {
       const group = section.dataset.group || '';
-      const show = filter === 'all' || group === filter;
+      const allowGroup = mode === 'utility' ? group === 'utility' : group === 'bqc';
+      const show = allowGroup && (filter === 'all' || group === filter || filter === mode);
       section.classList.toggle('is-hidden', !show);
     });
   }

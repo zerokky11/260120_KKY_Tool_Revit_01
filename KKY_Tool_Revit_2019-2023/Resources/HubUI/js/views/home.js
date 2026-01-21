@@ -1,6 +1,8 @@
 // Resources/HubUI/js/views/home.js
 import { clear, div } from '../core/dom.js';
 
+const MULTI_MODE_KEY = 'kky.hub.multiMode';
+
 export function renderHome(root) {
     const target = root || document.getElementById('view-root') || document.getElementById('app');
     clear(target);
@@ -32,7 +34,8 @@ export function renderHome(root) {
                 '공유파라미터 GUID 검토: 프로젝트/패밀리 내 공유 파라미터 GUID 검토',
                 '패밀리 공유파라미터 연동 검토: 복합 패밀리 연동 상태 점검',
                 'Point 추출: Project/Survey 포인트 좌표 추출'
-            ]
+            ],
+            'bqc'
         ),
         buildCard(
             '유틸리티',
@@ -42,6 +45,7 @@ export function renderHome(root) {
                 'PMS 검토: Segment ↔ PMS 매핑 및 사이즈 검토',
                 'GUID/연동/Point 추출/Project Parameter 추가',
             ],
+            'utility',
             'utilities'
         )
     );
@@ -49,7 +53,7 @@ export function renderHome(root) {
     view.append(hero, grid);
     target.append(view);
 
-    function buildCard(title, desc, hash, items, anchorId) {
+    function buildCard(title, desc, hash, items, multiMode, anchorId) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className = 'home-choice-card';
@@ -67,6 +71,7 @@ export function renderHome(root) {
             </div>
             <span class="home-choice-cta btn btn--primary">바로가기</span>`;
         card.addEventListener('click', () => {
+            if (multiMode) setMultiMode(multiMode);
             location.hash = `#${hash}`;
             if (anchorId) {
                 setTimeout(() => {
@@ -78,5 +83,12 @@ export function renderHome(root) {
             }
         });
         return card;
+    }
+
+    function setMultiMode(mode) {
+        try {
+            localStorage.setItem(MULTI_MODE_KEY, mode);
+        } catch {
+        }
     }
 }
