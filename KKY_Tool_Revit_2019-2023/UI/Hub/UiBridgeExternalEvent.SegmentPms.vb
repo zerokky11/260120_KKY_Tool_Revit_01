@@ -385,8 +385,19 @@ Namespace UI.Hub
                     Return
                 End If
 
+                Dim doneOk As Boolean = False
                 Try
-                    Dim loaded = SegmentPmsCheckService.LoadPmsExcel(dlg.FileName, unitPref)
+                    SendToWeb("segmentpms:progress", New With {.stage = "start", .total = 0, .index = 0, .message = "PMS 읽기 시작", .file = Path.GetFileName(dlg.FileName)})
+                    Dim loaded = SegmentPmsCheckService.LoadPmsExcel(dlg.FileName, unitPref,
+                                                                    Sub(total, index, message, sheet)
+                                                                        SendToWeb("segmentpms:progress", New With {
+                                                                            .stage = "extract",
+                                                                            .total = total,
+                                                                            .index = index,
+                                                                            .message = message,
+                                                                            .file = sheet
+                                                                        })
+                                                                    End Sub)
                     _pmsRows = loaded.Rows
                     _pmsUnitPref = unitPref
                     If loaded.Errors IsNot Nothing AndAlso loaded.Errors.Count > 0 Then
@@ -402,8 +413,13 @@ Namespace UI.Hub
                         groupPayload = BuildGroupPayload(groups)
                     End If
                     SendToWeb("segmentpms:pms-registered", New With {.path = dlg.FileName, .options = pmsOpts, .suggestions = suggestList, .groups = groupPayload})
+                    doneOk = True
                 Catch ex As Exception
                     SendToWeb("segmentpms:error", New With {.message = ex.Message})
+                Finally
+                    If doneOk Then
+                        SendToWeb("segmentpms:progress", New With {.stage = "done", .total = 0, .index = 0, .message = "PMS 읽기 완료", .file = Path.GetFileName(dlg.FileName)})
+                    End If
                 End Try
             End Using
         End Sub
@@ -448,26 +464,28 @@ Namespace UI.Hub
         End Sub
 
         Private Sub HandleSegmentPmsRun(app As UIApplication, payload As Object)
-            If _extractData Is Nothing Then
-                SendToWeb("segmentpms:error", New With {.message = "추출 데이터를 먼저 불러오세요."})
-                Return
-            End If
-            If _pmsRows Is Nothing Then
-                SendToWeb("segmentpms:error", New With {.message = "PMS Excel을 등록하세요."})
-                Return
-            End If
-
-            Dim pd = ParsePayloadDict(payload)
-            Dim maps = ParseMappings(pd)
-            Dim groupSelections = ParseGroupSelections(pd)
-            Dim opts = ParseCompareOptions(pd)
-            If (maps Is Nothing OrElse maps.Count = 0) AndAlso groupSelections IsNot Nothing AndAlso groupSelections.Count > 0 Then
-                Dim groups = SegmentPmsCheckService.BuildGroups(_extractData)
-                maps = SegmentPmsCheckService.ExpandGroupSelections(groups, groupSelections)
-            End If
-
-            _segmentPmsLastResult = Nothing
             Try
+                If _extractData Is Nothing Then
+                    SendToWeb("segmentpms:error", New With {.message = "추출 데이터를 먼저 불러오세요."})
+                    Return
+                End If
+                If _pmsRows Is Nothing Then
+                    SendToWeb("segmentpms:error", New With {.message = "PMS Excel을 등록하세요."})
+                    Return
+                End If
+
+                Dim pd = ParsePayloadDict(payload)
+                Dim maps = ParseMappings(pd)
+                Dim groupSelections = ParseGroupSelections(pd)
+                Dim opts = ParseCompareOptions(pd)
+                If (maps Is Nothing OrElse maps.Count = 0) AndAlso groupSelections IsNot Nothing AndAlso groupSelections.Count > 0 Then
+                    Dim groups = SegmentPmsCheckService.BuildGroups(_extractData)
+                    maps = SegmentPmsCheckService.ExpandGroupSelections(groups, groupSelections)
+                End If
+
+                SendToWeb("segmentpms:progress", New With {.stage = "start", .total = If(maps IsNot Nothing, maps.Count, 0), .index = 0, .message = "검토 준비 중"})
+
+                _segmentPmsLastResult = Nothing
                 Dim run = SegmentPmsCheckService.RunCompare(_extractData, _pmsRows, maps, opts)
                 _lastRunResult = run
                 _segmentPmsLastResult = New SegmentPmsResultCache With {.RunResult = run, .TotalCount = If(run.CompareTable Is Nothing, 0, run.CompareTable.Rows.Count)}
@@ -487,6 +505,7 @@ Namespace UI.Hub
                     .errors = err
                 })
             Catch ex As Exception
+                _segmentPmsLastResult = Nothing
                 SendToWeb("segmentpms:error", New With {.message = ex.Message})
             End Try
         End Sub

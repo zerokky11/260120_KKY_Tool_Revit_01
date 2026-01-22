@@ -147,6 +147,19 @@ export function renderSegmentPms(root) {
   renderRvtList();
   updateButtons();
   onHost(handleHost);
+  ProgressDialog.setActions({
+    onCancel: () => {
+      if (!state.busy) return;
+      state.busy = false;
+      setBusy(false);
+      ProgressDialog.hide();
+      toast('검토를 취소했습니다.', 'err');
+      updateButtons();
+    },
+    onSkip: () => {
+      toast('현재 작업은 다음 파일로 건너뛸 수 없습니다.', 'err');
+    }
+  });
 
   function persistRvt() { saveRvtList(state.rvtList); }
 
@@ -334,6 +347,7 @@ export function renderSegmentPms(root) {
         break;
       case 'segmentpms:pms-registered':
         setBusy(false); state.busy = false;
+        ProgressDialog.hide();
         state.pmsLoaded = true;
         state.pmsOpts = msg.payload?.options || [];
         state.suggestions = buildSuggestionMap(msg.payload?.suggestions || []);
@@ -353,6 +367,7 @@ export function renderSegmentPms(root) {
         break;
       case 'segmentpms:result':
         setBusy(false); state.busy = false;
+        ProgressDialog.hide();
         paintResults(msg.payload || {});
         updateButtons();
         break;
@@ -368,6 +383,7 @@ export function renderSegmentPms(root) {
         break;
       case 'segmentpms:error':
         setBusy(false); state.busy = false;
+        ProgressDialog.hide();
         toast(msg.payload?.message || '오류가 발생했습니다.', 'err');
         updateButtons();
         break;

@@ -14,6 +14,7 @@ Imports Autodesk.Revit.DB.Plumbing
 Imports Autodesk.Revit.UI
 Imports KKY_Tool_Revit.UI.Hub
 Imports NPOI.SS.UserModel
+Imports NPOI.SS.Formula.Eval
 Imports NPOI.SS.Util
 Imports NPOI.XSSF.UserModel
 Imports RvtDB = Autodesk.Revit.DB
@@ -437,7 +438,9 @@ Namespace Services
         ' ---------------------------
         ' PMS
         ' ---------------------------
-        Public Shared Function LoadPmsExcel(xlsxPath As String, preferredUnit As String) As LoadPmsResult
+        Public Shared Function LoadPmsExcel(xlsxPath As String,
+                                            preferredUnit As String,
+                                            Optional progress As Action(Of Integer, Integer, String, String) = Nothing) As LoadPmsResult
             Dim res As New LoadPmsResult With {.Table = BuildPmsTableSkeleton(), .Rows = New List(Of PmsRow)(), .Errors = New List(Of String)()}
             If String.IsNullOrWhiteSpace(xlsxPath) OrElse Not File.Exists(xlsxPath) Then
                 res.Errors.Add("PMS 파일이 존재하지 않습니다.")
@@ -459,59 +462,77 @@ Namespace Services
                 Return res
             End If
 
-            Dim headerMap = DetectHeader(sh)
-            If Not headerMap.ContainsKey("class") Then res.Errors.Add("CLASS 헤더를 찾을 수 없습니다.")
-            If Not headerMap.ContainsKey("segment") Then res.Errors.Add("Segment 헤더를 찾을 수 없습니다.")
-            If Not headerMap.ContainsKey("nd") Then res.Errors.Add("ND 헤더를 찾을 수 없습니다.")
-            If Not headerMap.ContainsKey("id") Then res.Errors.Add("ID 헤더를 찾을 수 없습니다.")
-            If Not headerMap.ContainsKey("od") Then res.Errors.Add("OD 헤더를 찾을 수 없습니다.")
-            If res.Errors.Count > 0 Then
+            Dim formatter As New DataFormatter(CultureInfo.InvariantCulture)
+            Dim evaluator As IFormulaEvaluator = wb.GetCreationHelper().CreateFormulaEvaluator()
+
+            Dim headerResult = ValidatePmsHeader(sh, formatter, evaluator)
+            If Not headerResult.Ok Then
+                res.Errors.AddRange(headerResult.Errors)
                 Return res
             End If
+            Dim headerMap = headerResult.HeaderMap
 
             Dim unitLabel As String = If(String.IsNullOrWhiteSpace(preferredUnit), "mm", preferredUnit).ToLowerInvariant()
 
             Dim lastRow As Integer = sh.LastRowNum
+            If progress IsNot Nothing Then
+                progress(Math.Max(lastRow, 0), 0, "PMS 읽기 시작", sh.SheetName)
+            End If
             For i As Integer = 1 To lastRow
                 Dim row As IRow = sh.GetRow(i)
                 If row Is Nothing Then
                     Continue For
                 End If
-                Dim cls As String = CellStr(row, headerMap("class"))
-                Dim seg As String = CellStr(row, headerMap("segment"))
-                Dim nd As Double = CellDbl(row, headerMap("nd"), 0)
-                Dim id As Double = CellDbl(row, headerMap("id"), 0)
-                Dim od As Double = CellDbl(row, headerMap("od"), 0)
+                Dim currentColumn As String = "CLASS"
+                Try
+                    currentColumn = "CLASS"
+                    Dim cls As String = CellStr(row, headerMap("class"), formatter, evaluator)
+                    currentColumn = "Segment"
+                    Dim seg As String = CellStr(row, headerMap("segment"), formatter, evaluator)
+                    currentColumn = "ND"
+                    Dim nd As Double = CellDbl(row, headerMap("nd"), 0, formatter, evaluator)
+                    currentColumn = "ID"
+                    Dim id As Double = CellDbl(row, headerMap("id"), 0, formatter, evaluator)
+                    currentColumn = "OD"
+                    Dim od As Double = CellDbl(row, headerMap("od"), 0, formatter, evaluator)
 
-                If String.IsNullOrWhiteSpace(seg) Then
-                    Continue For
-                End If
+                    If String.IsNullOrWhiteSpace(seg) Then
+                        Continue For
+                    End If
 
-                Dim ndMm As Double = nd
-                Dim idMm As Double = id
-                Dim odMm As Double = od
+                    Dim ndMm As Double = nd
+                    Dim idMm As Double = id
+                    Dim odMm As Double = od
 
-                If unitLabel.IndexOf("in", StringComparison.OrdinalIgnoreCase) >= 0 Then
-                    ndMm = nd * 25.4R
-                    idMm = id * 25.4R
-                    odMm = od * 25.4R
-                End If
+                    If unitLabel.IndexOf("in", StringComparison.OrdinalIgnoreCase) >= 0 Then
+                        ndMm = nd * 25.4R
+                        idMm = id * 25.4R
+                        odMm = od * 25.4R
+                    End If
 
-                Dim dataRow = res.Table.NewRow()
-                dataRow("CLASS") = cls
-                dataRow("PMS_SegmentKey") = seg
-                dataRow("ND_mm") = ndMm
-                dataRow("ID_mm") = idMm
-                dataRow("OD_mm") = odMm
-                res.Table.Rows.Add(dataRow)
+                    Dim dataRow = res.Table.NewRow()
+                    dataRow("CLASS") = cls
+                    dataRow("PMS_SegmentKey") = seg
+                    dataRow("ND_mm") = ndMm
+                    dataRow("ID_mm") = idMm
+                    dataRow("OD_mm") = odMm
+                    res.Table.Rows.Add(dataRow)
 
-                res.Rows.Add(New PmsRow With {
-                    .Class = cls,
-                    .SegmentKey = seg,
-                    .NdMm = ndMm,
-                    .IdMm = idMm,
-                    .OdMm = odMm
-                })
+                    res.Rows.Add(New PmsRow With {
+                        .Class = cls,
+                        .SegmentKey = seg,
+                        .NdMm = ndMm,
+                        .IdMm = idMm,
+                        .OdMm = odMm
+                    })
+                Catch ex As Exception
+                    res.Errors.Add($"PMS 읽기 오류 (시트:{sh.SheetName}, 행:{i + 1}, 열:{currentColumn}): {ex.Message}")
+                    Exit For
+                Finally
+                    If progress IsNot Nothing AndAlso (i Mod 100 = 0 OrElse i = lastRow) Then
+                        progress(Math.Max(lastRow, 0), i, "PMS 읽는 중", sh.SheetName)
+                    End If
+                End Try
             Next
 
             Return res
@@ -1925,20 +1946,58 @@ Namespace Services
             End Try
         End Function
 
-        Private Shared Function DetectHeader(sh As ISheet) As Dictionary(Of String, Integer)
-            Dim map As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
+        Private Class HeaderValidationResult
+            Public Property Ok As Boolean
+            Public Property HeaderMap As Dictionary(Of String, Integer)
+            Public Property Errors As List(Of String)
+        End Class
+
+        Private Shared Function ValidatePmsHeader(sh As ISheet,
+                                                  formatter As DataFormatter,
+                                                  evaluator As IFormulaEvaluator) As HeaderValidationResult
+            Dim result As New HeaderValidationResult With {
+                .Ok = False,
+                .HeaderMap = New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase),
+                .Errors = New List(Of String)()
+            }
+
             Dim head As IRow = sh.GetRow(0)
             If head Is Nothing Then
-                Return map
+                result.Errors.Add("양식 불일치: 헤더 행을 찾을 수 없습니다.")
+                Return result
             End If
+
+            Dim headerTexts As New List(Of String)()
             For i As Integer = 0 To head.LastCellNum - 1
-                Dim name = CellStr(head, i).Trim()
-                Dim key = NormalizeHeader(name)
-                If Not String.IsNullOrEmpty(key) AndAlso Not map.ContainsKey(key) Then
-                    map(key) = i
+                Dim raw = CellStr(head, i, formatter, evaluator).Trim()
+                headerTexts.Add(raw)
+                Dim key = NormalizeHeader(raw)
+                If Not String.IsNullOrEmpty(key) AndAlso Not result.HeaderMap.ContainsKey(key) Then
+                    result.HeaderMap(key) = i
                 End If
             Next
-            Return map
+
+            Dim expected As String() = {"class", "segment", "nd", "id", "od"}
+            Dim missing = expected.Where(Function(k) Not result.HeaderMap.ContainsKey(k)).ToList()
+            If missing.Count > 0 Then
+                result.Errors.Add("양식 불일치: 필수 헤더가 누락되었습니다. (" & String.Join(", ", missing) & ")")
+                Return result
+            End If
+
+            Dim expectedOrder As Boolean = True
+            For i As Integer = 0 To expected.Length - 1
+                If result.HeaderMap(expected(i)) <> i Then
+                    expectedOrder = False
+                    Exit For
+                End If
+            Next
+            If Not expectedOrder Then
+                result.Errors.Add("양식 불일치: 헤더 순서가 올바르지 않습니다. (필수 순서: CLASS, Segment, ND, ID, OD)")
+                Return result
+            End If
+
+            result.Ok = True
+            Return result
         End Function
 
         Private Shared Function NormalizeHeader(name As String) As String
@@ -2365,6 +2424,13 @@ Namespace Services
         End Class
 
         Private Shared Function CellStr(row As IRow, col As Integer) As String
+            Return CellStr(row, col, Nothing, Nothing)
+        End Function
+
+        Private Shared Function CellStr(row As IRow,
+                                        col As Integer,
+                                        formatter As DataFormatter,
+                                        evaluator As IFormulaEvaluator) As String
             If row Is Nothing OrElse col < 0 Then
                 Return String.Empty
             End If
@@ -2372,62 +2438,44 @@ Namespace Services
             If cell Is Nothing Then
                 Return String.Empty
             End If
+            Dim localFormatter = If(formatter, New DataFormatter(CultureInfo.InvariantCulture))
             Try
-                Select Case cell.CellType
-                    Case NpoiCellType.String
-                        Return cell.StringCellValue
-                    Case NpoiCellType.Boolean
-                        Return cell.BooleanCellValue.ToString(CultureInfo.InvariantCulture)
-                    Case NpoiCellType.Numeric
-                        Return cell.NumericCellValue.ToString(CultureInfo.InvariantCulture)
-                    Case NpoiCellType.Formula
-                        If cell.CachedFormulaResultType = NpoiCellType.Numeric Then
-                            Return cell.NumericCellValue.ToString(CultureInfo.InvariantCulture)
-                        End If
-                        If cell.CachedFormulaResultType = NpoiCellType.String Then
-                            Return cell.StringCellValue
-                        End If
-                    Case Else
-                        Return cell.ToString()
-                End Select
+                If cell.CellType = NpoiCellType.Error Then
+                    Return ErrorEval.GetText(cell.ErrorCellValue)
+                End If
+                If evaluator IsNot Nothing AndAlso cell.CellType = NpoiCellType.Formula Then
+                    Return localFormatter.FormatCellValue(cell, evaluator)
+                End If
+                Return localFormatter.FormatCellValue(cell)
             Catch
-                Return String.Empty
+                Try
+                    Return cell.ToString()
+                Catch
+                    Return String.Empty
+                End Try
             End Try
-            Return String.Empty
         End Function
 
         Private Shared Function CellDbl(row As IRow, col As Integer, Optional def As Double = Double.NaN) As Double
-            If row Is Nothing OrElse col < 0 Then
+            Return CellDbl(row, col, def, Nothing, Nothing)
+        End Function
+
+        Private Shared Function CellDbl(row As IRow,
+                                        col As Integer,
+                                        Optional def As Double = Double.NaN,
+                                        Optional formatter As DataFormatter = Nothing,
+                                        Optional evaluator As IFormulaEvaluator = Nothing) As Double
+            Dim text As String = CellStr(row, col, formatter, evaluator)
+            If String.IsNullOrWhiteSpace(text) Then
                 Return def
             End If
-            Dim cell As ICell = row.GetCell(col)
-            If cell Is Nothing Then
-                Return def
+            Dim v As Double
+            If Double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, v) Then
+                Return v
             End If
-            Try
-                Select Case cell.CellType
-                    Case NpoiCellType.Numeric
-                        Return cell.NumericCellValue
-                    Case NpoiCellType.String
-                        Dim txt = cell.StringCellValue
-                        Dim v As Double
-                        If Double.TryParse(txt, NumberStyles.Any, CultureInfo.InvariantCulture, v) Then
-                            Return v
-                        End If
-                    Case NpoiCellType.Formula
-                        If cell.CachedFormulaResultType = NpoiCellType.Numeric Then
-                            Return cell.NumericCellValue
-                        End If
-                        If cell.CachedFormulaResultType = NpoiCellType.String Then
-                            Dim txt = cell.StringCellValue
-                            Dim v As Double
-                            If Double.TryParse(txt, NumberStyles.Any, CultureInfo.InvariantCulture, v) Then
-                                Return v
-                            End If
-                        End If
-                End Select
-            Catch
-            End Try
+            If Double.TryParse(text, NumberStyles.Any, CultureInfo.CurrentCulture, v) Then
+                Return v
+            End If
             Return def
         End Function
 

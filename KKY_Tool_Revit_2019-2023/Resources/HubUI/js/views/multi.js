@@ -13,10 +13,10 @@ const FEATURE_META = {
 const FEATURE_KEYS = Object.keys(FEATURE_META);
 const COMMON_OPTIONS_KEY = 'kky.hub.commonOptions';
 const GROUP_FILTER_KEY = 'kky.hub.multiGroupFilter';
+const MULTI_MODE_KEY = 'kky.hub.multiMode';
 const GROUPS = [
   { id: 'all', label: '전체' },
   { id: 'bqc', label: '납품 시 BQC 검토' },
-  { id: 'periodic', label: '주기적 검토' },
   { id: 'utility', label: '유틸리티' }
 ];
 
@@ -25,6 +25,8 @@ export function renderMulti(root) {
   clear(target);
   const top = document.querySelector('#topbar-root .topbar') || document.querySelector('.topbar');
   if (top) top.classList.add('hub-topbar');
+
+  const multiMode = normalizeMultiMode(getMultiMode());
 
   const state = {
     rvtList: [],
@@ -60,6 +62,7 @@ export function renderMulti(root) {
       selectedTableBody: null,
       selectedRows: new Map(),
       groupFilter: 'all',
+      multiMode: multiMode,
       isRvtListExpanded: false,
       reviewSummaryData: null
     }
@@ -72,12 +75,7 @@ export function renderMulti(root) {
   const page = div('feature-shell multi-page HubShell');
   const hasLocalCommonOptions = loadCommonOptionsFromStorage();
   const header = div('feature-header multi-header');
-  header.innerHTML = `
-    <div class="feature-heading">
-      <span class="feature-kicker">Multi RVT Hub</span>
-      <h2 class="feature-title">다중 RVT 검토 허브</h2>
-      <p class="feature-sub">파일별로 열고 선택된 기능을 순차 실행합니다.</p>
-    </div>`;
+  header.innerHTML = buildHeaderHtml(state.ui.multiMode);
   page.append(header);
 
   const layout = div('multi-layout HubBody');
@@ -85,24 +83,36 @@ export function renderMulti(root) {
   const rightCol = div('multi-right HubRight');
 
   const group1 = buildGroupSection('납품 시 BQC 검토', '커넥터 진단 (BQC용)', 'bqc');
-  const group2 = buildGroupSection('주기적 검토', 'PMS / GUID / 파라미터 연동', 'periodic');
-  const group3 = buildGroupSection('유틸리티', '공유 파라미터 연동 / Point 추출', 'utility');
+  const group3 = buildGroupSection('유틸리티', 'PMS / GUID / 패밀리 연동 / Point 추출 / Project Parameter', 'utility');
+  group3.section.id = 'utilities';
 
   const group1Options = buildGroup1Options();
   group1.section.append(group1Options);
   group1.section.append(buildToggleRow('connector', buildConnectorConfig()));
-  group2.section.append(buildPmsWorkflowRow());
-  group2.section.append(buildToggleRow('guid', buildGuidConfig()));
+  group3.section.append(buildPmsWorkflowRow());
+  group3.section.append(buildToggleRow('guid', buildGuidConfig()));
   group3.section.append(buildToggleRow('familylink', buildFamilyLinkConfig()));
   group3.section.append(buildToggleRow('points', buildPointsConfig()));
+  group3.section.append(buildSharedParamBatchRow());
+  if (state.ui.multiMode === 'bqc' && group1.section.querySelectorAll('.feature-row').length === 0) {
+    const empty = div('feature-note');
+    empty.textContent = '등록된 BQC 검토 기능이 없습니다.';
+    group1.section.append(empty);
+  }
 
+  state.ui.groupFilter = state.ui.multiMode;
+  saveGroupFilter(state.ui.multiMode);
   const rightFilter = buildGroupFilter();
   const leftTop = div('left-sticky HubLeftTop');
   leftTop.append(buildRunBar());
   const leftSelected = div('HubLeftSelected');
   leftSelected.append(buildSelectedFeaturesSection());
   leftCol.append(leftTop, leftSelected, buildRvtSection());
-  rightCol.append(rightFilter, group1.wrap, group2.wrap, group3.wrap);
+  if (state.ui.multiMode === 'bqc') {
+    rightCol.append(rightFilter, group1.wrap);
+  } else {
+    rightCol.append(rightFilter, group3.wrap);
+  }
   layout.append(leftCol, rightCol);
   page.append(layout);
   page.append(buildSettingsModal());
@@ -138,7 +148,7 @@ export function renderMulti(root) {
     const pct = Math.max(0, Math.min(100, pctValue));
     state.ui.lastProgressPct = pct;
     const phase = String(payload?.phase || payload?.Phase || '').toLowerCase();
-    ProgressDialog.show(payload?.title || '다중 RVT 검토', payload?.message || '');
+    ProgressDialog.show(payload?.title || '납품시 BQC 검토', payload?.message || '');
     ProgressDialog.update(pct, payload?.message || '', payload?.detail || '');
     updateRunProgress(pct, payload?.message || '', payload?.detail || '');
     if (phase === 'done' || pct >= 100) {
@@ -229,6 +239,36 @@ export function renderMulti(root) {
     post('sharedparam:list', { source: 'multi', context: context || '' });
   }
 
+  function normalizeMultiMode(value) {
+    if (value === 'utility') return 'utility';
+    return 'bqc';
+  }
+
+  function getMultiMode() {
+    try {
+      return localStorage.getItem(MULTI_MODE_KEY) || 'bqc';
+    } catch {
+      return 'bqc';
+    }
+  }
+
+  function buildHeaderHtml(mode) {
+    if (mode === 'utility') {
+      return `
+    <div class="feature-heading">
+      <span class="feature-kicker">Utilities</span>
+      <h2 class="feature-title">유틸리티</h2>
+      <p class="feature-sub">납품시 BQC 검토 유틸리티 도구 모음입니다.</p>
+    </div>`;
+    }
+    return `
+    <div class="feature-heading">
+      <span class="feature-kicker">Multi RVT Hub</span>
+      <h2 class="feature-title">납품시 BQC 검토</h2>
+      <p class="feature-sub">납품 검토를 위한 유틸리티 기능을 모아 실행합니다.</p>
+    </div>`;
+  }
+
   function buildGroupSection(title, desc, groupId) {
     const wrap = div('multi-section');
     if (groupId) wrap.dataset.group = groupId;
@@ -242,7 +282,10 @@ export function renderMulti(root) {
     const wrap = div('group-filter');
     const stored = getGroupFilter();
     state.ui.groupFilter = stored;
+    const mode = state.ui.multiMode || 'bqc';
+    const allowed = mode === 'utility' ? ['utility'] : ['bqc'];
     GROUPS.forEach((group) => {
+      if (group.id !== 'all' && !allowed.includes(group.id)) return;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'group-filter__btn';
@@ -387,6 +430,36 @@ export function renderMulti(root) {
     row.append(header, summary);
     row.addEventListener('click', () => {
       location.hash = '#segmentpms';
+    });
+    row.classList.add('is-clickable');
+    return row;
+  }
+
+  function buildSharedParamBatchRow() {
+    const row = div('feature-row feature-row--workflow');
+    const header = div('feature-row__header');
+    const left = div('feature-row__left');
+    const icon = document.createElement('span');
+    icon.className = 'feature-row__icon';
+    icon.textContent = 'SP';
+    const title = document.createElement('strong');
+    title.textContent = 'Project Parameter 추가 (Project/Shared)';
+    const desc = document.createElement('span');
+    desc.textContent = 'Project/Shared 파라미터를 여러 RVT에 일괄 추가/바인딩합니다.';
+    left.append(icon, title, desc);
+
+    const right = div('feature-row__right');
+    const chip = document.createElement('span');
+    chip.className = 'chip chip--info';
+    chip.textContent = '별도 워크플로우';
+    right.append(chip);
+
+    const summary = div('feature-row__summary');
+    summary.textContent = '파라미터 선택 → 바인딩 설정 → RVT 실행 → 로그/엑셀';
+    header.append(left, right);
+    row.append(header, summary);
+    row.addEventListener('click', () => {
+      location.hash = '#sharedparambatch';
     });
     row.classList.add('is-clickable');
     return row;
@@ -1119,7 +1192,7 @@ export function renderMulti(root) {
       }
     }
     setBusyState(true);
-    ProgressDialog.show('다중 RVT 검토', '준비 중...');
+    ProgressDialog.show('납품시 BQC 검토', '준비 중...');
     ProgressDialog.update(0, '준비 중...', '');
     post('hub:multi-run', buildPayload());
   }
@@ -1548,10 +1621,12 @@ export function renderMulti(root) {
 
   function renderGroupVisibility() {
     const filter = state.ui.groupFilter || 'all';
+    const mode = state.ui.multiMode || 'bqc';
     const sections = rightCol.querySelectorAll('.multi-section');
     sections.forEach((section) => {
       const group = section.dataset.group || '';
-      const show = filter === 'all' || group === filter;
+      const allowGroup = mode === 'utility' ? group === 'utility' : group === 'bqc';
+      const show = allowGroup && (filter === 'all' || group === filter || filter === mode);
       section.classList.toggle('is-hidden', !show);
     });
   }
