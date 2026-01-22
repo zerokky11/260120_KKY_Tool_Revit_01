@@ -386,7 +386,16 @@ Namespace UI.Hub
                 End If
 
                 Try
-                    Dim loaded = SegmentPmsCheckService.LoadPmsExcel(dlg.FileName, unitPref)
+                    Dim loaded = SegmentPmsCheckService.LoadPmsExcel(dlg.FileName, unitPref,
+                                                                    Sub(total, index, message, sheet)
+                                                                        SendToWeb("segmentpms:progress", New With {
+                                                                            .stage = "extract",
+                                                                            .total = total,
+                                                                            .index = index,
+                                                                            .message = message,
+                                                                            .file = sheet
+                                                                        })
+                                                                    End Sub)
                     _pmsRows = loaded.Rows
                     _pmsUnitPref = unitPref
                     If loaded.Errors IsNot Nothing AndAlso loaded.Errors.Count > 0 Then
