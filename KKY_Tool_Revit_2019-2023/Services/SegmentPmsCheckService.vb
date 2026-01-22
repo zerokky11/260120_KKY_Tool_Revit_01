@@ -14,6 +14,7 @@ Imports Autodesk.Revit.DB.Plumbing
 Imports Autodesk.Revit.UI
 Imports KKY_Tool_Revit.UI.Hub
 Imports NPOI.SS.UserModel
+Imports NPOI.SS.Formula.Eval
 Imports NPOI.SS.Util
 Imports NPOI.XSSF.UserModel
 Imports RvtDB = Autodesk.Revit.DB
