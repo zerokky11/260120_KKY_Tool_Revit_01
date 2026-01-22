@@ -385,7 +385,9 @@ Namespace UI.Hub
                     Return
                 End If
 
+                Dim doneOk As Boolean = False
                 Try
+                    SendToWeb("segmentpms:progress", New With {.stage = "start", .total = 0, .index = 0, .message = "PMS 읽기 시작", .file = Path.GetFileName(dlg.FileName)})
                     Dim loaded = SegmentPmsCheckService.LoadPmsExcel(dlg.FileName, unitPref,
                                                                     Sub(total, index, message, sheet)
                                                                         SendToWeb("segmentpms:progress", New With {
@@ -411,8 +413,13 @@ Namespace UI.Hub
                         groupPayload = BuildGroupPayload(groups)
                     End If
                     SendToWeb("segmentpms:pms-registered", New With {.path = dlg.FileName, .options = pmsOpts, .suggestions = suggestList, .groups = groupPayload})
+                    doneOk = True
                 Catch ex As Exception
                     SendToWeb("segmentpms:error", New With {.message = ex.Message})
+                Finally
+                    If doneOk Then
+                        SendToWeb("segmentpms:progress", New With {.stage = "done", .total = 0, .index = 0, .message = "PMS 읽기 완료", .file = Path.GetFileName(dlg.FileName)})
+                    End If
                 End Try
             End Using
         End Sub

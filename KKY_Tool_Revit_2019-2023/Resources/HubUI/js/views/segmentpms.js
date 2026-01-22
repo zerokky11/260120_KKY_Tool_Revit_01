@@ -347,6 +347,7 @@ export function renderSegmentPms(root) {
         break;
       case 'segmentpms:pms-registered':
         setBusy(false); state.busy = false;
+        ProgressDialog.hide();
         state.pmsLoaded = true;
         state.pmsOpts = msg.payload?.options || [];
         state.suggestions = buildSuggestionMap(msg.payload?.suggestions || []);
