@@ -129,6 +129,7 @@
 		<Compile Include="Services\GuidAuditService.vb" />
 		<Compile Include="Services\SegmentPmsCheckService.vb" />
 		<Compile Include="Services\FamilyLinkAuditService.vb" />
+		<Compile Include="Services\SharedParamBatchService.vb" />
 		<Compile Include="UI\Hub\ExcelProgressReporter.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.Export.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.Connector.vb" />
@@ -138,6 +139,7 @@
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.ParamProp.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.FamilyLinkAudit.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.Multi.vb" />
+		<Compile Include="UI\Hub\UiBridgeExternalEvent.SharedParamBatch.vb" />
 		<Compile Include="UI\Hub\UiBridgeExternalEvent.Core.vb" />
 		<Compile Include="UI\Hub\HubHostWindow.vb" />
 	</ItemGroup>
